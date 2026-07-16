@@ -58,6 +58,14 @@ code { background: rgba(127,127,127,.14); padding: .05em .35em; border-radius: 6
 .btn--ghost[aria-pressed="true"] { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
 .btn--icon { padding: 6px 10px; background: transparent; color: var(--ink); border-color: var(--line); }
 
+.projbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px 0; max-width: 900px; margin: 0 auto; }
+.projbar__lbl { font-size: .8rem; color: var(--muted); flex: none; }
+.select {
+  flex: 1; min-width: 0; font: inherit; font-size: .85rem; font-weight: 600;
+  padding: 7px 10px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink);
+}
+
 .progress { padding: 10px 16px 0; }
 .progress__bar { height: 8px; background: var(--line); border-radius: 999px; overflow: hidden; }
 .progress__fill { height: 100%; width: 0; background: var(--vung); transition: width .4s ease; }
@@ -107,9 +115,14 @@ main { padding: 14px 16px 40px; max-width: 900px; margin: 0 auto; }
 .node__stat { font-size: 10px; color: var(--muted); margin-top: auto; }
 .edge { fill: none; stroke: var(--muted); stroke-width: 2; opacity: .55; }
 .edge.hot { stroke: var(--brand); opacity: 1; stroke-width: 3; }
-.edge-label { font-size: 11px; }
-.edge-label__bg { fill: var(--panel); stroke: var(--line); }
-.edge-label__txt { fill: var(--ink); }
+.edge-fo { overflow: visible; pointer-events: none; }
+.edge-label2 { height: 100%; display: flex; align-items: center; justify-content: center; }
+.edge-label2 span {
+  background: var(--panel); border: 1px solid var(--brand); color: var(--ink);
+  font-size: 11px; line-height: 1.35; padding: 5px 9px; border-radius: 8px;
+  max-width: 188px; text-align: center; box-shadow: var(--shadow);
+  word-break: break-word;
+}
 
 /* Chi tiết dạng accordion */
 .detail { padding: 8px; }

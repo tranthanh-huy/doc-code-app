@@ -23,6 +23,12 @@
     </div>
   </header>
 
+  <div class="projbar" id="projbar" hidden>
+    <label class="projbar__lbl" for="projectPicker">Dự án đang xem:</label>
+    <select id="projectPicker" class="select" aria-label="Chọn dự án"></select>
+    <button id="btnDeleteProject" class="btn btn--icon" type="button" title="Xoá dự án này khỏi tủ" aria-label="Xoá khỏi tủ">🗑</button>
+  </div>
+
   <section class="progress" id="progressWrap" hidden>
     <div class="progress__bar"><div class="progress__fill" id="progressFill"></div></div>
     <p class="progress__label" id="progressLabel"></p>

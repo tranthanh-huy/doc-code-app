@@ -10,7 +10,9 @@
    ============================================================ */
 
 const SVGNS = 'http://www.w3.org/2000/svg';
-const DATA_KEY = 'doc-code:sodo';
+const LIB_KEY = 'doc-code:lib';       // { [tênDựÁn]: sodoData } — tủ nhiều dự án
+const CUR_KEY = 'doc-code:current';   // tên dự án đang xem
+const OLD_DATA_KEY = 'doc-code:sodo';  // cache đơn cũ (để di cư)
 const PROG_PREFIX = 'doc-code:progress:';
 const STATE_LABEL = { chua: 'chưa', lomo: 'lơ mơ', vung: 'vững' };
 
@@ -51,10 +53,15 @@ function seedFromLegacy(nodes) {
   if (changed) saveProgress();
 }
 
-/* ---------- Nạp / lưu dữ liệu ---------- */
+/* ---------- Tủ nhiều dự án ---------- */
 
-function saveDataCache(data) { try { localStorage.setItem(DATA_KEY, JSON.stringify(data)); } catch (_) {} }
-function loadDataCache() { try { const s = localStorage.getItem(DATA_KEY); return s ? JSON.parse(s) : null; } catch (_) { return null; } }
+function loadLib() { try { const s = localStorage.getItem(LIB_KEY); return s ? JSON.parse(s) : {}; } catch (_) { return {}; } }
+function saveLib(lib) { try { localStorage.setItem(LIB_KEY, JSON.stringify(lib)); } catch (_) {} }
+function getCurrent() { try { return localStorage.getItem(CUR_KEY) || ''; } catch (_) { return ''; } }
+function setCurrent(name) { try { localStorage.setItem(CUR_KEY, name); } catch (_) {} }
+function projName(data) { return (data && data.project) ? data.project : 'sơ đồ không tên'; }
+
+/* ---------- Nạp / lưu dữ liệu ---------- */
 
 function validate(data) {
   if (!data || typeof data !== 'object') throw new Error('File không phải JSON hợp lệ.');
@@ -62,14 +69,59 @@ function validate(data) {
   return data;
 }
 
-function useData(data, { cache = true } = {}) {
+// addToLib=true: nhập/cập nhật vào tủ và đặt làm dự án hiện tại (khi người dùng nhập file).
+// addToLib=false: chỉ xem tạm (ví dụ file mẫu), không lưu vào tủ.
+function useData(data, { addToLib = true } = {}) {
   DATA = validate(data);
+  if (addToLib) {
+    const lib = loadLib();
+    lib[projName(DATA)] = DATA;
+    saveLib(lib);
+    setCurrent(projName(DATA));
+  }
   loadProgress();
   seedFromLegacy(DATA.nodes);
-  if (cache) saveDataCache(DATA);
   selectedId = null;
   render();
-  toast(`Đã nạp: ${DATA.project || 'sơ đồ'}`);
+  refreshPicker();
+  toast(`Đã nạp: ${projName(DATA)}`);
+}
+
+function refreshPicker() {
+  const lib = loadLib();
+  const names = Object.keys(lib);
+  const bar = $('#projbar'), sel = $('#projectPicker');
+  if (!names.length) { bar.hidden = true; return; }
+  bar.hidden = false;
+  sel.innerHTML = '';
+  names.forEach((n) => {
+    const o = document.createElement('option');
+    o.value = n; o.textContent = n;
+    if (DATA && n === projName(DATA)) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function switchProject(name) {
+  const lib = loadLib();
+  if (!lib[name]) return;
+  DATA = lib[name];
+  setCurrent(name);
+  loadProgress();
+  seedFromLegacy(DATA.nodes);
+  selectedId = null;
+  render();
+  refreshPicker();
+}
+
+function deleteProject(name) {
+  const lib = loadLib();
+  if (!lib[name]) return;
+  delete lib[name];
+  saveLib(lib);
+  const rest = Object.keys(lib);
+  if (rest.length) { switchProject(rest[0]); toast(`Đã xoá "${name}" khỏi tủ`); }
+  else { DATA = null; setCurrent(''); showEmpty(true); refreshPicker(); toast(`Đã xoá "${name}". Tủ trống.`); }
 }
 
 function importFromFile(file) {
@@ -167,6 +219,7 @@ function drawMap() {
   const edges = Array.isArray(DATA.edges) ? DATA.edges : [];
   const gEdges = el('g');
   svg.appendChild(gEdges);
+  const pendingLabels = [];  // vẽ sau cùng để nằm ĐÈ lên node
 
   edges.forEach((e) => {
     const a = pos[e.tu], b = pos[e.den];
@@ -179,7 +232,7 @@ function drawMap() {
     path.setAttribute('d', `M ${a.x} ${a.y} Q ${cxp} ${cyp} ${b.x} ${b.y}`);
     path.style.color = hot ? '' : 'var(--muted)';
     gEdges.appendChild(path);
-    if (hot && e.nhan) drawEdgeLabel(gEdges, cxp, cyp, e.nhan);
+    if (hot && e.nhan) pendingLabels.push({ x: cxp, y: cyp, text: e.nhan });
   });
 
   top.forEach((node) => {
@@ -203,21 +256,22 @@ function drawMap() {
     svg.appendChild(g);
   });
 
+  // Nhãn mũi tên vẽ SAU CÙNG → nằm đè lên node, không bị che, chữ đầy đủ.
+  pendingLabels.forEach((l) => drawEdgeLabel(svg, l.x, l.y, l.text));
+
   svg.onclick = () => selectNode(null);
   $('#mapHint').textContent = selectedId
     ? 'Đường xanh là các kết nối của ô đang chọn. Chạm nền để bỏ chọn.'
     : 'Chạm vào một ô để xem nó nối với ai và vì sao.';
 }
 
+// Nhãn mũi tên: dùng foreignObject để chữ TỰ XUỐNG DÒNG đầy đủ, có nền, không cắt cụt.
 function drawEdgeLabel(parent, x, y, text) {
-  const t = text.length > 42 ? text.slice(0, 41) + '…' : text;
-  const w = Math.min(260, t.length * 6.4 + 16), h = 22;
-  const g = el('g', { class: 'edge-label' });
-  g.appendChild(el('rect', { class: 'edge-label__bg', x: x - w / 2, y: y - h / 2, width: w, height: h, rx: 6 }));
-  const txt = el('text', { class: 'edge-label__txt', x: x, y: y + 4, 'text-anchor': 'middle' });
-  txt.textContent = t;
-  g.appendChild(txt);
-  parent.appendChild(g);
+  const LW = 190, LH = 96;
+  const fo = el('foreignObject', { x: x - LW / 2, y: y - LH / 2, width: LW, height: LH, class: 'edge-fo' });
+  fo.innerHTML =
+    `<div xmlns="http://www.w3.org/1999/xhtml" class="edge-label2"><span>${escapeHtml(text)}</span></div>`;
+  parent.appendChild(fo);
 }
 
 function isNeighbor(id, edges, sel) {
@@ -408,6 +462,14 @@ function bind() {
   $('#btnImport2').addEventListener('click', openPicker);
   fileInput.addEventListener('change', () => importFromFile(fileInput.files[0]));
 
+  // Tủ nhiều dự án
+  $('#projectPicker').addEventListener('change', (e) => switchProject(e.target.value));
+  $('#btnDeleteProject').addEventListener('click', () => {
+    if (!DATA) return;
+    const name = projName(DATA);
+    if (confirm(`Xoá "${name}" khỏi tủ? (Chỉ xoá trong app này, không đụng file gốc.)`)) deleteProject(name);
+  });
+
   // Mở bảng chọn kiểu ôn
   $('#btnReview').addEventListener('click', () => { $('#reviewStart').hidden = false; });
   $('#rsAll').addEventListener('click', () => { $('#reviewStart').hidden = true; startReview(false); });
@@ -434,11 +496,28 @@ function bind() {
 
 async function boot() {
   bind();
-  const cached = loadDataCache();
-  if (cached) { useData(cached, { cache: false }); return; }
+  // Di cư: nếu còn cache đơn kiểu cũ và tủ đang trống → đưa vào tủ.
+  try {
+    const lib = loadLib();
+    const old = localStorage.getItem(OLD_DATA_KEY);
+    if (old && !Object.keys(lib).length) {
+      const d = JSON.parse(old);
+      lib[projName(d)] = d; saveLib(lib); setCurrent(projName(d));
+    }
+    localStorage.removeItem(OLD_DATA_KEY);
+  } catch (_) {}
+
+  const lib = loadLib();
+  const names = Object.keys(lib);
+  if (names.length) {
+    const cur = getCurrent();
+    switchProject(lib[cur] ? cur : names[0]);
+    return;
+  }
+  // Tủ trống → xem tạm file mẫu (không lưu vào tủ).
   try {
     const res = await fetch('sample-sodo.json', { cache: 'no-store' });
-    if (res.ok) { useData(await res.json(), { cache: false }); return; }
+    if (res.ok) { useData(await res.json(), { addToLib: false }); return; }
   } catch (_) {}
   showEmpty(true);
 }
