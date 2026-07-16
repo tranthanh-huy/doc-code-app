@@ -8,10 +8,9 @@
       "loai": "khuVuc",
       "ten": "Giao diện web (thứ người dùng thấy)",
       "moTa": "Trang web hiện danh sách việc cần làm; gửi yêu cầu tới server khi bạn thêm/xoá việc.",
-      "daHoc": "vung",
       "con": [
-        { "id": "web/main.js", "loai": "file", "ten": "Cửa vào trang", "moTa": "Nơi trang bắt đầu chạy; dựng giao diện và gắn các nút.", "daHoc": "lomo" },
-        { "id": "web/api.js", "loai": "file", "ten": "Người đưa thư", "moTa": "Gọi tới server để lấy/lưu danh sách việc.", "daHoc": "chua" }
+        { "id": "web/main.js", "loai": "file", "ten": "Cửa vào trang", "moTa": "Nơi trang bắt đầu chạy; dựng giao diện và gắn các nút." },
+        { "id": "web/api.js", "loai": "file", "ten": "Người đưa thư", "moTa": "Gọi tới server để lấy/lưu danh sách việc." }
       ]
     },
     {
@@ -19,10 +18,9 @@
       "loai": "khuVuc",
       "ten": "Server (người giữ kho việc)",
       "moTa": "Nhận yêu cầu từ web, đọc/ghi việc vào cơ sở dữ liệu.",
-      "daHoc": "lomo",
       "con": [
-        { "id": "server/index.js", "loai": "file", "ten": "Quầy tiếp nhận", "moTa": "Nhận các yêu cầu GET/POST /todos.", "daHoc": "chua" },
-        { "id": "server/db.js", "loai": "file", "ten": "Sổ ghi việc", "moTa": "Đọc và ghi danh sách việc xuống cơ sở dữ liệu.", "daHoc": "chua" }
+        { "id": "server/index.js", "loai": "file", "ten": "Quầy tiếp nhận", "moTa": "Nhận các yêu cầu GET/POST /todos." },
+        { "id": "server/db.js", "loai": "file", "ten": "Sổ ghi việc", "moTa": "Đọc và ghi danh sách việc xuống cơ sở dữ liệu." }
       ]
     },
     {
@@ -30,7 +28,6 @@
       "loai": "ngoai",
       "ten": "Cơ sở dữ liệu (kho lưu trữ)",
       "moTa": "Nơi cất các việc cần làm để không mất khi tắt máy. Không phải code của mình.",
-      "daHoc": "vung",
       "con": []
     }
   ],

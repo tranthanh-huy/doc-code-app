@@ -17,7 +17,7 @@
       <p id="projectMeta" class="muted"></p>
     </div>
     <div class="topbar__actions">
-      <button id="btnReview" class="btn btn--ghost" type="button" aria-pressed="false">Chế độ ôn</button>
+      <button id="btnReview" class="btn btn--ghost" type="button">Ôn tập</button>
       <button id="btnImport" class="btn" type="button">Nhập sơ đồ…</button>
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
     </div>
@@ -67,6 +67,59 @@
       </section>
     </div>
   </main>
+
+  <!-- Hộp chọn kiểu ôn -->
+  <div id="reviewStart" class="modal" hidden>
+    <div class="modal__card">
+      <h2>Ôn tập bằng lật thẻ</h2>
+      <p class="muted">App sẽ hiện tên từng phần và <b>giấu mô tả</b>. Bạn tự nhớ lại nó làm gì, nối với ai — rồi mới lật xem đúng không, và tự chấm. Nhớ trước, xem sau.</p>
+      <div class="modal__actions">
+        <button id="rsWeak" class="btn" type="button">Chỉ ôn phần chưa vững</button>
+        <button id="rsAll" class="btn btn--ghost" type="button">Ôn tất cả</button>
+        <button id="rsCancel" class="btn btn--ghost" type="button">Thôi</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Màn hình lật thẻ -->
+  <div id="reviewOverlay" class="review" hidden>
+    <div class="review__top">
+      <span id="rvCount" class="review__count"></span>
+      <button id="rvClose" class="btn btn--icon" type="button" aria-label="Đóng">✕</button>
+    </div>
+
+    <div class="review__card">
+      <div class="rv__kind" id="rvKind"></div>
+      <div class="rv__title" id="rvTitle"></div>
+      <div class="rv__cur" id="rvCurState"></div>
+
+      <div id="rvAsk" class="rv__ask">
+        <p>Tự nhớ lại: <b>phần này làm gì? nối với ai?</b></p>
+        <p class="muted">Nghĩ ra câu trả lời trong đầu (hoặc nói ra) trước khi lật.</p>
+      </div>
+
+      <div id="rvAnswer" class="rv__answer" hidden>
+        <div class="rv__label">Mô tả</div>
+        <p id="rvMoTa" class="rv__mota"></p>
+        <div id="rvConnsWrap" hidden>
+          <div class="rv__label">Kết nối</div>
+          <ul id="rvConns" class="rv__conns"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="review__foot">
+      <button id="rvReveal" class="btn btn--big" type="button">Lật thẻ xem đáp án</button>
+      <div id="rvGrades" class="rv__grades" hidden>
+        <p class="muted">Bạn nhớ tới đâu?</p>
+        <div class="rv__grades-row">
+          <button id="rvGradeChua" class="btn grade grade--chua" type="button">Chưa nhớ</button>
+          <button id="rvGradeLomo" class="btn grade grade--lomo" type="button">Lơ mơ</button>
+          <button id="rvGradeVung" class="btn grade grade--vung" type="button">Nhớ rõ</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <div id="toast" class="toast" hidden></div>
 
