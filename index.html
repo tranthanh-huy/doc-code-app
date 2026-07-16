@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f766e" />
+  <title>Bản đồ đọc code</title>
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="icon.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="topbar__left">
+      <h1 id="projectName">Bản đồ đọc code</h1>
+      <p id="projectMeta" class="muted"></p>
+    </div>
+    <div class="topbar__actions">
+      <button id="btnReview" class="btn btn--ghost" type="button" aria-pressed="false">Chế độ ôn</button>
+      <button id="btnImport" class="btn" type="button">Nhập sơ đồ…</button>
+      <input id="fileInput" type="file" accept="application/json,.json" hidden />
+    </div>
+  </header>
+
+  <section class="progress" id="progressWrap" hidden>
+    <div class="progress__bar"><div class="progress__fill" id="progressFill"></div></div>
+    <p class="progress__label" id="progressLabel"></p>
+  </section>
+
+  <main id="app">
+    <!-- Trạng thái trống -->
+    <div id="emptyState" class="empty" hidden>
+      <div class="empty__card" id="dropZone">
+        <div class="empty__icon">🗺️</div>
+        <h2>Chưa có sơ đồ nào</h2>
+        <p class="muted">Chọn file <code>sodo.json</code> (nằm trong thư mục <code>.doc-code/</code> của dự án bạn đang học), hoặc kéo-thả file vào đây.</p>
+        <button id="btnImport2" class="btn" type="button">Chọn file sodo.json</button>
+      </div>
+    </div>
+
+    <!-- Sơ đồ + chi tiết -->
+    <div id="content" hidden>
+      <section class="panel">
+        <div class="panel__head">
+          <h2>Sơ đồ kết nối</h2>
+          <div class="hint" id="mapHint">Chạm vào một ô để xem nó nối với ai và vì sao.</div>
+          <div class="zoombar">
+            <button class="btn btn--icon" id="zoomOut" type="button" aria-label="Thu nhỏ">−</button>
+            <button class="btn btn--icon" id="zoomReset" type="button" aria-label="Vừa màn hình">⤢</button>
+            <button class="btn btn--icon" id="zoomIn" type="button" aria-label="Phóng to">+</button>
+          </div>
+        </div>
+        <div class="mapwrap" id="mapWrap">
+          <svg id="map" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <div class="legend">
+          <span class="legend__item"><i class="dot dot--chua"></i>chưa</span>
+          <span class="legend__item"><i class="dot dot--lomo"></i>lơ mơ</span>
+          <span class="legend__item"><i class="dot dot--vung"></i>vững</span>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__head"><h2>Chi tiết từng phần</h2></div>
+        <div id="detail" class="detail"></div>
+      </section>
+    </div>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

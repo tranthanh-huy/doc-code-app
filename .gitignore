@@ -1,0 +1,9 @@
+# Không đẩy dữ liệu học THẬT lên GitHub (repo công khai).
+# Chỉ giữ file minh hoạ sample-sodo.json.
+sodo.json
+.doc-code/
+
+# Rác công cụ
+.claude/
+.DS_Store
+Thumbs.db

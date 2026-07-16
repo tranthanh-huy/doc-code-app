@@ -1,0 +1,16 @@
+{
+  "name": "Bản đồ đọc code",
+  "short_name": "Đọc code",
+  "description": "Xem và ôn sơ đồ cấu trúc dự án sinh ra từ skill doc-code.",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0d1117",
+  "theme_color": "#0f766e",
+  "lang": "vi",
+  "icons": [
+    { "src": "icon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "icon-maskable.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "maskable" }
+  ]
+}
