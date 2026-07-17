@@ -1,11 +1,12 @@
 /* Service worker: cache vỏ app để chạy offline.
    Đổi CACHE mỗi khi sửa app để buộc cập nhật. */
-const CACHE = 'doc-code-app-v12';
+const CACHE = 'doc-code-app-v13';
 const SHELL = [
   './',
   './index.html',
   './style.css',
   './app.js',
+  './qrcode.js',
   './manifest.webmanifest',
   './icon.svg',
   './icon-maskable.svg'

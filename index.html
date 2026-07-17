@@ -17,6 +17,7 @@
       <p id="projectMeta" class="muted"></p>
     </div>
     <div class="topbar__actions">
+      <button id="btnShare" class="btn btn--outline" type="button" title="Hiện QR để máy khác quét">Chia sẻ…</button>
       <button id="btnImportUrl" class="btn btn--outline" type="button">Từ link…</button>
       <button id="btnImport" class="btn" type="button">Nhập file…</button>
       <input id="fileInput" type="file" accept="application/json,.json" hidden />
@@ -70,6 +71,20 @@
 
   <div id="toast" class="toast" hidden></div>
 
+  <div id="shareModal" class="modal" hidden>
+    <div class="modal__card">
+      <div class="modal__head">
+        <h2>Chia sẻ sang máy khác</h2>
+        <button id="shareClose" class="btn btn--outline btn--icon" type="button" aria-label="Đóng">✕</button>
+      </div>
+      <div id="shareQr" class="share__qr"></div>
+      <p id="shareNote" class="muted share__note"></p>
+      <p class="share__urlwrap"><code id="shareUrl" class="share__url"></code></p>
+      <p class="muted share__hint">Trên điện thoại: mở camera hoặc app quét QR. Trên máy không quét được: mở đúng link ở trên. Chỉ cần làm một lần cho mỗi máy.</p>
+    </div>
+  </div>
+
+  <script src="qrcode.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

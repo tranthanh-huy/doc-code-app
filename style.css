@@ -165,3 +165,18 @@ body.fs .panel--map .hint {
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: var(--radius);
   font-size: .85rem; z-index: 50; max-width: 90vw; text-align: center;
 }
+
+/* Hộp chia sẻ (QR): phủ nền, thẻ trắng viền đen — không bóng/không mờ (hợp E Ink). */
+.modal {
+  position: fixed; inset: 0; z-index: 200; background: var(--bg);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) 16px 24px; overflow: auto;
+}
+.modal__card { width: 100%; max-width: 360px; border: 2px solid var(--ink); border-radius: var(--radius); background: var(--bg); padding: 14px; }
+.modal__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.share__qr { width: 100%; max-width: 300px; margin: 0 auto; aspect-ratio: 1 / 1; border: 2px solid var(--ink); border-radius: var(--radius); }
+.share__qr svg { display: block; }
+.share__note { font-size: .85rem; margin: 12px 0 6px; }
+.share__urlwrap { margin: 0 0 10px; }
+.share__url { display: block; word-break: break-all; font-size: .72rem; border: 1px solid var(--line-soft); padding: 8px; border-radius: var(--radius); }
+.share__hint { font-size: .78rem; margin: 0; }

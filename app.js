@@ -11,6 +11,7 @@ const SVGNS = 'http://www.w3.org/2000/svg';
 const LIB_KEY = 'doc-code:lib';        // { [tênDựÁn]: sodoData } — tủ nhiều dự án
 const CUR_KEY = 'doc-code:current';    // tên dự án đang xem
 const SYNC_KEY = 'doc-code:syncurls';  // { [tênDựÁn]: link tải trực tiếp } — đồng bộ tự động
+const INDEX_KEY = 'doc-code:indexurl'; // link "mục lục" (một link tổng cho MỌI dự án)
 const OLD_DATA_KEY = 'doc-code:sodo';  // cache đơn cũ (để di cư)
 
 const $ = (sel) => document.querySelector(sel);
@@ -32,26 +33,67 @@ function saveSync(m) { try { localStorage.setItem(SYNC_KEY, JSON.stringify(m)); 
 function getSyncUrl(name) { return loadSync()[name] || ''; }
 function setSyncUrl(name, url) { const m = loadSync(); if (url) m[name] = url; else delete m[name]; saveSync(m); }
 
-// Tải sodo.json từ một link trực tiếp (có phá cache để luôn lấy bản mới nhất).
-async function fetchSodo(url) {
+function getIndexUrl() { try { return localStorage.getItem(INDEX_KEY) || ''; } catch (_) { return ''; } }
+function setIndexUrl(u) { try { if (u) localStorage.setItem(INDEX_KEY, u); else localStorage.removeItem(INDEX_KEY); } catch (_) {} }
+
+// Tải JSON thô từ một link trực tiếp (có phá cache để luôn lấy bản mới nhất).
+async function fetchJson(url) {
   const u = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
   const res = await fetch(u, { cache: 'no-store' });
   if (!res.ok) throw new Error('HTTP ' + res.status);
-  return validate(await res.json());
+  return res.json();
 }
+async function fetchSodo(url) { return validate(await fetchJson(url)); }
 
-// Nhập một dự án bằng link + ghi nhớ link để lần sau tự làm mới.
-async function importFromUrl(url) {
+// Nhập từ MỘT link, tự đoán loại:
+//  - có "projects[]"  -> đây là MỤC LỤC (index): nạp mọi dự án bên trong.
+//  - có "nodes[]"     -> đây là MỘT dự án lẻ: nạp như cũ.
+// Cùng một hàm phục vụ cả nút "Từ link…" lẫn deep-link ?sync=.
+async function importAuto(url, { silent = false } = {}) {
   url = (url || '').trim();
   if (!url) return;
-  try {
-    const data = await fetchSodo(url);
-    setSyncUrl(projName(data), url);
-    useData(data, { addToLib: true });
-    toast('Đã nhập & gắn link: ' + projName(data));
-  } catch (e) {
-    toast('Nhập từ link lỗi: ' + e.message + ' — hãy dùng link TẢI TRỰC TIẾP.');
+  let raw;
+  try { raw = await fetchJson(url); }
+  catch (e) { if (!silent) toast('Tải link lỗi: ' + e.message + ' — hãy dùng link TẢI TRỰC TIẾP.'); return; }
+
+  if (raw && Array.isArray(raw.projects)) {
+    await importIndex(raw, url, { silent });
+  } else if (raw && Array.isArray(raw.nodes)) {
+    setSyncUrl(projName(raw), url);
+    useData(raw, { addToLib: true });
+    if (!silent) toast('Đã nhập & gắn link: ' + projName(raw));
+  } else if (!silent) {
+    toast('Link không phải sơ đồ hợp lệ (thiếu "nodes" hoặc "projects").');
   }
+}
+
+// Nạp một mục lục: ghi nhớ link tổng, rồi tải sodo.json của TỪNG dự án bên trong.
+async function importIndex(idx, url, { silent = false } = {}) {
+  setIndexUrl(url);
+  const projs = Array.isArray(idx.projects) ? idx.projects : [];
+  let ok = 0, firstName = null;
+  for (const p of projs) {
+    if (!p || !p.link) continue;
+    try {
+      const data = await fetchSodo(p.link);
+      const name = projName(data);
+      const lib = loadLib(); lib[name] = data; saveLib(lib);
+      setSyncUrl(name, p.link);
+      if (!firstName) firstName = name;
+      ok++;
+    } catch (_) { /* một dự án lỗi thì bỏ qua, vẫn nạp các dự án còn lại */ }
+  }
+  refreshPicker();
+  if (!DATA && firstName) {
+    const cur = getCurrent();
+    switchProject(loadLib()[cur] ? cur : firstName);
+  } else if (DATA) {
+    // đang xem một dự án: cập nhật lại chính nó nếu mục lục có bản mới
+    const cur = projName(DATA);
+    if (loadLib()[cur]) { DATA = loadLib()[cur]; render(); }
+    refreshPicker();
+  }
+  if (!silent) toast(`Đã đồng bộ mục lục: ${ok}/${projs.length} dự án`);
 }
 
 // Tải lại dữ liệu mới nhất của một dự án đã gắn link.
@@ -437,6 +479,43 @@ function toast(msg) {
   toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
 }
 
+/* ---------- Chia sẻ sang máy khác (QR + link) ---------- */
+// Vẽ mã QR ra SVG (ô đen trên nền trắng, sắc nét cho E Ink). Có viền trắng "quiet zone".
+function qrSvg(text) {
+  const qr = QRCode.encode(text, 'M');
+  const n = qr.size, quiet = 4, dim = n + quiet * 2;
+  let rects = '';
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      if (qr.get(x, y)) rects += `<rect x="${x + quiet}" y="${y + quiet}" width="1" height="1"/>`;
+    }
+  }
+  return `<svg viewBox="0 0 ${dim} ${dim}" width="100%" height="100%" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">`
+    + `<rect width="${dim}" height="${dim}" fill="#ffffff"/><g fill="#000000">${rects}</g></svg>`;
+}
+
+// Link nạp-sẵn để máy khác chỉ cần MỞ là tự nuốt (không phải gõ/dán gì).
+function shareLink() {
+  const idx = getIndexUrl();
+  const single = (DATA && getSyncUrl(projName(DATA))) || '';
+  const target = idx || single; // ưu tiên mục lục; nếu chưa có thì chia sẻ dự án đang xem
+  if (!target) return { url: '', isIndex: false };
+  const base = location.origin + location.pathname;
+  return { url: base + '?sync=' + encodeURIComponent(target), isIndex: !!idx };
+}
+
+function openShare() {
+  const { url, isIndex } = shareLink();
+  if (!url) { toast('Chưa có link đồng bộ để chia sẻ. Hãy nạp link mục lục trước (nút "Từ link…").'); return; }
+  $('#shareQr').innerHTML = qrSvg(url);
+  $('#shareUrl').textContent = url;
+  $('#shareNote').textContent = isIndex
+    ? 'Máy khác quét QR này (hoặc mở link bên dưới) là có TẤT CẢ dự án — chỉ một lần đời.'
+    : 'Chưa có mục lục — QR này chỉ chia sẻ dự án đang xem. Nạp link mục lục để chia sẻ mọi dự án.';
+  $('#shareModal').hidden = false;
+}
+function closeShare() { $('#shareModal').hidden = true; }
+
 /* ---------- Pan + zoom ---------- */
 
 function bindPan() {
@@ -525,10 +604,14 @@ function bind() {
   fileInput.addEventListener('change', () => importFromFile(fileInput.files[0]));
 
   $('#btnImportUrl').addEventListener('click', () => {
-    const u = prompt('Dán LINK TẢI TRỰC TIẾP tới sodo.json\n(ví dụ link "raw" của Gist bí mật):');
-    if (u) importFromUrl(u);
+    const u = prompt('Dán LINK TẢI TRỰC TIẾP (raw của Gist bí mật):\n• link MỤC LỤC → nạp mọi dự án\n• link một sodo.json → nạp một dự án');
+    if (u) importAuto(u);
   });
   $('#btnRefresh').addEventListener('click', () => { if (DATA) refreshProject(projName(DATA), { silent: false }); });
+
+  $('#btnShare').addEventListener('click', openShare);
+  $('#shareClose').addEventListener('click', closeShare);
+  $('#shareModal').addEventListener('click', (e) => { if (e.target.id === 'shareModal') closeShare(); });
 
   $('#projectPicker').addEventListener('change', (e) => switchProject(e.target.value));
   $('#btnDeleteProject').addEventListener('click', () => {
@@ -572,11 +655,21 @@ async function boot() {
     localStorage.removeItem(OLD_DATA_KEY);
   } catch (_) {}
 
+  // Deep-link ?sync=<link>: máy mới chỉ cần MỞ link (hoặc quét QR) là tự nuốt.
+  const params = new URLSearchParams(location.search);
+  const syncParam = params.get('sync');
+  if (syncParam) {
+    try { history.replaceState(null, '', location.pathname + location.hash); } catch (_) {} // dọn URL cho sạch
+    await importAuto(syncParam);
+  }
+
   const lib = loadLib();
   const names = Object.keys(lib);
   if (names.length) {
-    const cur = getCurrent();
-    switchProject(lib[cur] ? cur : names[0]);
+    if (!DATA) { const cur = getCurrent(); switchProject(lib[cur] ? cur : names[0]); }
+    // Đã có mục lục? Lặng lẽ tải lại để DỰ ÁN MỚI (skill vừa thêm) tự hiện, không cần làm gì.
+    const iu = getIndexUrl();
+    if (iu && !syncParam) importAuto(iu, { silent: true });
     return;
   }
   try {

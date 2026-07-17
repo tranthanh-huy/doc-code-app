@@ -12,6 +12,10 @@ Có **2 công cụ đi cùng nhau**:
 Nói gọn: **skill làm ra bản đồ, app để ngắm bản đồ.** Gist là "ống dẫn" đưa bản đồ từ máy tính
 sang điện thoại.
 
+> ✨ **Tự động tối đa:** bạn **không bao giờ phải đi dán link cho từng dự án nữa.** Có **một
+> "mục lục" chung** cho tất cả dự án. Học dự án mới → nó **tự hiện** trong app. Mỗi máy chỉ cần
+> cài **một lần đời**.
+
 App chạy trực tuyến: **https://tranthanh-huy.github.io/doc-code-app/**
 
 ---
@@ -32,17 +36,29 @@ App chạy trực tuyến: **https://tranthanh-huy.github.io/doc-code-app/**
 
 ---
 
-## Phần 2 — Cài đồng bộ Gist (chỉ làm **một lần** cho mỗi dự án)
+## Phần 2 — Nối app với "mục lục" (chỉ làm **một lần cho mỗi máy**, không phải mỗi dự án)
 
-Đây là bước để bản đồ **tự chạy sang điện thoại**. Làm một lần thôi, sau đó quên luôn.
+Đây là bước để bản đồ **tự chạy sang điện thoại**. Làm một lần cho mỗi máy, sau đó quên luôn —
+**mọi dự án về sau tự chui vào, khỏi đụng tay.**
 
-1. Cuối buổi, bảo Claude: *"cài đồng bộ Gist cho dự án này"*.
-2. Claude tạo một **Gist bí mật** (kho lưu riêng trên GitHub của bạn) và đưa bạn **một đường link**.
-3. Bạn mở **app**, bấm nút **"Từ link…"** (góc trên bên phải), **dán link** vào, Enter.
-4. Xong. App **nhớ link này mãi mãi** — lần sau khỏi dán lại.
+**Trên máy tính (nơi bạn học):**
 
-> 🔒 Gist **bí mật**: chỉ ai có link mới xem được. **Đừng đăng link ở nơi công khai.** Riêng dự
-> án nhạy cảm (như `license-tool`) thì càng phải giữ kín.
+1. Cuối buổi đầu tiên, bảo Claude: *"cài đồng bộ cho dự án này"*.
+2. Claude tự lo phần khó: tạo Gist cho dự án, tạo **mục lục chung**, rồi đưa bạn **một đường
+   link bấm-được**. Bạn chỉ cần **bấm vào link đó một lần** — app trên máy tính tự nuốt mục lục.
+
+**Đưa sang các máy khác (mỗi máy một lần đời):**
+
+| Thiết bị | Cách nối |
+|---|---|
+| **Điện thoại** | Trên app máy tính bấm **"Chia sẻ…"** → hiện **mã QR** → điện thoại **quét** một phát |
+| **Máy đọc E-Ink** (không có camera) | Bấm **"Từ link…"** trong app, **dán link mục lục** một lần |
+| **Máy tính khác** | Bấm lại đường link Claude đưa (hoặc "Từ link…" dán link mục lục) |
+
+Xong. Từ đó về sau, **học thêm dự án nào nó tự hiện trong app**, không phải làm gì thêm.
+
+> 🔒 Mục lục là Gist **bí mật** gộp *tất cả* dự án: chỉ ai có link mới xem được. **Đừng đăng
+> link ở nơi công khai.** Dự án nhạy cảm (như `license-tool`) thì càng phải giữ kín.
 
 ---
 
@@ -56,6 +72,7 @@ Các nút chính:
 | Nút | Làm gì |
 |---|---|
 | **Ô "Dự án:"** | Chọn dự án muốn xem (nếu có nhiều) |
+| **"Chia sẻ…"** | Hiện **mã QR** để một máy khác quét là có ngay **tất cả** dự án |
 | **"Làm mới"** | Kéo bản mới nhất từ Gist về |
 | **"Vừa"** | Canh cả sơ đồ vừa khít màn hình |
 | **" + / − "** | Phóng to / thu nhỏ |
@@ -76,11 +93,12 @@ Học trên máy tính (skill)  →  cuối buổi Claude tự đẩy lên Gist
 Mở app trên điện thoại  →  bấm "Làm mới"  →  thấy bản đồ mới
 ```
 
-1. Học xong một buổi trên máy tính.
-2. Claude **tự đẩy** bản đồ mới lên Gist (nó nhớ, tự làm cuối buổi).
-3. Cầm điện thoại lên, mở app, **chờ khoảng nửa phút** rồi bấm **"Làm mới"**.
-4. Bản đồ mới hiện ra. Ngắm lại cả bức tranh, thử **kể lại một phần bằng lời của mình** — đó là
-   cách chắc chắn nhất để biết mình đã thật sự hiểu.
+1. Học xong một buổi trên máy tính (dự án cũ **hay dự án mới toanh** đều được).
+2. Claude **tự đẩy** bản đồ mới lên Gist **và tự thêm dự án vào mục lục** (nó nhớ, tự làm cuối buổi).
+3. Cầm điện thoại lên, mở app, **chờ khoảng nửa phút** rồi bấm **"Làm mới"** (hoặc mở lại app).
+4. Bản đồ mới hiện ra — **dự án mới cũng tự xuất hiện trong ô "Dự án:", không cần dán gì.** Ngắm
+   lại cả bức tranh, thử **kể lại một phần bằng lời của mình** — cách chắc nhất để biết mình đã
+   thật sự hiểu.
 
 > ⏳ **Vì sao phải chờ ~30 giây?** GitHub giữ tạm bản cũ khoảng nửa phút. Không phải lỗi — cứ
 > chờ chút rồi "Làm mới" lại là ra bản mới.
@@ -91,8 +109,9 @@ Mở app trên điện thoại  →  bấm "Làm mới"  →  thấy bản đồ
 
 1. **Không cần đụng vào code hay file `sodo.json`** — skill lo hết. Việc của bạn là đoán, hiểu,
    kể lại.
-2. **Link Gist dán vào app đúng một lần** cho mỗi dự án. Sau đó chỉ cần "Làm mới".
-3. **Bản đồ mới không hiện ngay?** → chờ ~30 giây, bấm "Làm mới". Vẫn không được thì kiểm tra mạng.
+2. **Chỉ cài mục lục một lần cho mỗi máy** (không phải mỗi dự án). Sau đó dự án mới tự hiện, bạn
+   chỉ cần "Làm mới".
+3. **Bản đồ / dự án mới không hiện ngay?** → chờ ~30 giây, bấm "Làm mới". Vẫn không được thì kiểm tra mạng.
 
 ---
 

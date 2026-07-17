@@ -215,58 +215,105 @@ Things **not tied to any node**: concepts that just clicked ("hôm nay hiểu 'b
 có tên"), recurring mistakes ("hay lẫn hàm với biến"), learning goals. Markdown, in
 Vietnamese, for the human to read.
 
-## Syncing to the review app via a secret Gist
+## Syncing to the review app — one "index Gist" for ALL projects
 
-Goal: after a session, the map appears on the user's phone / E-Ink **by itself** — no manual
-file copying. The mechanism is a **secret GitHub Gist** holding `sodo.json`; the app reads its
-raw link and auto-refreshes. (Decided: Gist, not Drive/Dropbox — Drive blocks CORS; the user
-already has GitHub. A secret Gist is "private unless the link leaks" — the user accepts that.)
+Goal: **the user never pastes a per-project link again.** Study a new project → it **appears
+by itself** in the review app on every device. Each device is touched **once, ever**.
 
-**Prerequisite (one-time per machine):** `gh` (GitHub CLI) installed and the user logged in
-(`gh auth status` shows a user). **You never log in for them** — if not logged in, tell them
-in Vietnamese to open a new PowerShell and run `gh auth login` (GitHub.com → HTTPS → login
-with a web browser), then continue. Never handle raw tokens in chat.
+Two layers of secret Gist:
+
+- **Per-project Gist** (as before): holds that project's `sodo.json`. Its id lives in the
+  project's `.doc-code/gist-id.txt`.
+- **One "index Gist" for the whole user** (new): a single secret Gist named
+  `doc-code-index.json` with the fixed description **`doc-code-index [khong-xoa]`**, holding a
+  list of every project + its raw link:
+
+  ```json
+  { "docCodeIndex": 1, "projects": [
+    { "ten": "ZIC Curve Profiles (Hair Blockout Tool)",
+      "link": "https://gist.githubusercontent.com/<user>/<GIST_ID>/raw/sodo.json" }
+  ] }
+  ```
+
+The app stores **one link** — the index's raw link — and reads the whole list from it. New
+project added to the index → next time the app opens, it shows up automatically.
+
+(Decided: Gist, not Drive/Dropbox — Drive blocks CORS; the user already has GitHub. A secret
+Gist is "private unless the link leaks" — the user accepts that.)
+
+**Prerequisite (per machine):** `gh` installed and logged in (`gh auth status` shows a user).
+**You never log in for them** — if not logged in, tell them in Vietnamese to open a new
+PowerShell and run `gh auth login` (GitHub.com → HTTPS → web browser), then continue. Never
+handle raw tokens in chat.
+
+### Finding the index Gist (works across the user's MULTIPLE machines)
+
+The user runs this skill on **more than one computer**, all logged into the **same GitHub
+account**. So GitHub — not a local file — is the source of truth. Resolve the index id in this
+order:
+
+1. **Cache:** read `~/.doc-code/index-gist-id.txt` (here: `C:\Users\haian\.doc-code\index-gist-id.txt`).
+   This is a global, cross-project file (NOT inside any project). If present, use it.
+2. **Discover on GitHub** (cache missing — e.g. a second machine):
+   `gh api gists --jq '.[] | select(.description=="doc-code-index [khong-xoa]") | .id'`
+   → take the first id, then **write it back to the cache** for next time.
+3. **Create once (first time ever):** write `{"docCodeIndex":1,"projects":[]}` to a temp
+   `doc-code-index.json`, then `gh gist create -d "doc-code-index [khong-xoa]" doc-code-index.json`
+   (secret by default — do **not** pass `--secret`, it errors). Parse the id from the URL and
+   save it to the cache.
 
 ### First time enabling sync for a project (do it once, with the user)
 
-1. Make sure `sodo.json` is written to `.doc-code/sodo.json`.
-2. Create the secret Gist and grab its id:
-   `gh gist create .doc-code/sodo.json` → prints a URL ending in the **GIST_ID**.
-   (Gists are secret by default in this `gh` version — do **not** pass `--secret`, it errors.)
-3. Save the id: write that GIST_ID (one line) into `.doc-code/gist-id.txt`.
-4. Build the **raw link** and give it to the user to paste into the app:
-   `https://gist.githubusercontent.com/<user>/<GIST_ID>/raw/sodo.json`
-   (get `<user>` from `gh api user --jq .login`). In the app: **"Từ link…"** → dán link. The
-   app remembers it and auto-refreshes on open — they only paste it once, ever.
+1. Write `sodo.json` to `.doc-code/sodo.json`.
+2. Per-project Gist: if `.doc-code/gist-id.txt` is missing, `gh gist create .doc-code/sodo.json`,
+   parse the **GIST_ID** from the URL, save it (one line) to `.doc-code/gist-id.txt`.
+   The project's raw link is `https://gist.githubusercontent.com/<user>/<GIST_ID>/raw/sodo.json`
+   (get `<user>` from `gh api user --jq .login`).
+3. Resolve the index id (section above), then **add this project to the index if absent**:
+   read the index file (`gh gist view <IDXID> --raw`), and if no entry has this project's
+   `link`, append `{ "ten": <project name from sodo.json>, "link": <raw link> }`, write the
+   file back, and `gh gist edit <IDXID> <updated doc-code-index.json>`. Dedupe by **link**
+   (stable per project), not by name.
+4. **Onboard the user's devices to the index — once per device, ever:**
+   - **Desktop (this machine):** print a clickable link and tell them to open it once:
+     `https://<user>.github.io/doc-code-app/?sync=<URL-encoded index raw link>`
+     where the index raw link is `https://gist.githubusercontent.com/<user>/<IDXID>/raw/doc-code-index.json`.
+     Opening it makes the app swallow the index — no typing.
+   - **Phone:** on the desktop app press **"Chia sẻ…"** → a **QR** appears → phone scans it.
+   - **E-Ink (rare, no camera):** in the app press **"Từ link…"** and paste the index raw link
+     once. (The "Từ link…" box auto-detects index vs single project.)
 
-### Every session after that (the actual end-of-session push)
+### Every session after that (end-of-session push)
 
-If `.doc-code/gist-id.txt` exists, push the fresh map:
-`gh gist edit $(cat .doc-code/gist-id.txt) .doc-code/sodo.json`
+1. Push the fresh per-project map: `gh gist edit $(cat .doc-code/gist-id.txt) .doc-code/sodo.json`.
+2. **Ensure the project is in the index** (step 3 above) — normally already there, so this is a
+   no-op; it only adds an entry the first time or if the index was recreated.
 
-**Tell the user (in Vietnamese) about the ~30-second delay:** GitHub's raw link is cached by
-a CDN for roughly half a minute, and the app's cache-buster can't defeat it. So after you
-push, the app may show the old map for up to ~30s — wait a moment, then press **"Làm mới"**
-(or reopen the app) and the new map appears. This is normal, not a bug.
+The user does **nothing** in the app — on next open it re-reads the index and shows the latest.
+
+**~30-second CDN delay (tell the user in Vietnamese):** GitHub's raw links (both the index and
+each `sodo.json`) are cached ~30s and the cache-buster can't beat it. After a push the app may
+show the old version briefly — wait a moment, then reopen or press **"Làm mới"**.
 
 ### Security — before pushing, check the project
 
-A secret Gist is only private *while the link stays secret*. For a **sensitive project**
-(e.g. anti-piracy / license code), a secret Gist is acceptable **only if the link is never
-shared** — never post it anywhere public, and never make the Gist public. If unsure whether a
-project is sensitive, **ask the user first** before creating or pushing to any Gist.
+A secret Gist (index or per-project) is only private *while its link stays secret*. For a
+**sensitive project** (e.g. anti-piracy / license code), it's acceptable **only if the link is
+never shared** — never post it publicly, never make the Gist public, and note the index link
+now aggregates *all* projects, so guard it the same way. If unsure whether a project is
+sensitive, **ask the user first** before creating or pushing to any Gist.
 
 ## End of session
 
 - Update `sodo.json` (structure/`moTa` only — **never** a progress field) and `ghi-chu.md`.
 - **State clearly where the file lives:** "`.doc-code/sodo.json`".
-- **Push to the Gist if sync is set up** (see the section above): if `.doc-code/gist-id.txt`
-  exists, run `gh gist edit $(cat .doc-code/gist-id.txt) .doc-code/sodo.json` and remind them
-  of the ~30s CDN delay before the app shows the new map. If sync isn't set up yet and they
-  want it, walk through "First time enabling sync" once.
-- **Point them to the app to see the whole map:** now that the new map is on the Gist, they
-  can open the review app on any device to look over today's picture as one connected whole —
-  a good way to let it settle.
+- **Push to the Gist if sync is set up** (see "Every session after that"): if
+  `.doc-code/gist-id.txt` exists, run `gh gist edit $(cat .doc-code/gist-id.txt) .doc-code/sodo.json`,
+  **make sure the project is in the index Gist**, and remind them of the ~30s CDN delay. If sync
+  isn't set up yet and they want it, walk through "First time enabling sync" once.
+- **Point them to the app to see the whole map:** the new map is on the Gist and already listed
+  in the index, so they just **open the review app on any device** — no pasting — to look over
+  today's picture as one connected whole. A good way to let it settle.
 - **Lock it in by restating, not by grading:** invite them to **restate a part in their own
   words** in one sentence — the surest way for them to feel they truly read it, without
   trusting anyone's word. (There is no score to record; understanding shows in the retelling.)
@@ -282,9 +329,12 @@ producing a `sodo.json` the app can read:
   (zoom file ↔ function) plus a detail list. It is a **read-only viewer** — it does not track
   learning progress or grade anything (an earlier flashcard/progress feature was removed).
   Runs in the browser = **0 tokens**.
-- Desktop ↔ phone sync uses a **secret GitHub Gist** (raw link, CORS-friendly), **no** custom
-  backend or account. See "Syncing to the review app via a secret Gist" above. (Earlier plan
-  was Drive/Dropbox — dropped: Drive blocks CORS.)
+- Desktop ↔ phone sync uses **secret GitHub Gists** (raw link, CORS-friendly), **no** custom
+  backend or account. The app stores **one** link — a per-user **index Gist** listing every
+  project — so a new project appears by itself and no per-project link is ever pasted. The app
+  reads `?sync=<link>` deep-links (used by the QR in **"Chia sẻ…"**) and its **"Từ link…"** box
+  auto-detects an index vs a single-project link. See "Syncing to the review app — one index
+  Gist" above. (Earlier plan was Drive/Dropbox — dropped: Drive blocks CORS.)
 - Therefore `sodo.json` must always stay **one compact, self-contained, portable file**, and
   node `id`s must stay **stable** across regenerations so a redrawn map still matches the
   user's bearings and their `ghi-chu.md` notes.
