@@ -492,6 +492,29 @@ function bindPan() {
   }, { passive: false });
 }
 
+/* ---------- Phóng to sơ đồ ra toàn màn hình ---------- */
+// Phủ kín khung trình duyệt bằng class .fs (không dùng Fullscreen API → chạy mọi máy).
+// Thoát bằng 3 cách: nút ✕, phím Esc, nút Back (đẩy 1 mục lịch sử khi vào, lùi khi ra).
+let fsOn = false;
+function refitMap() { if (DATA) { view.fitted = false; drawMap(); } }  // tự canh "Vừa" theo khung mới
+function enterFs() {
+  if (fsOn) return;
+  fsOn = true;
+  document.body.classList.add('fs');
+  try { history.pushState({ docFs: true }, ''); } catch (_) {}
+  refitMap();
+}
+function closeFs() {                       // gỡ chế độ, KHÔNG đụng lịch sử (gọi khi popstate báo về)
+  if (!fsOn) return;
+  fsOn = false;
+  document.body.classList.remove('fs');
+  refitMap();
+}
+function requestExitFs() {                 // ✕ / Esc: lùi lịch sử → popstate sẽ gọi closeFs()
+  if (!fsOn) return;
+  try { history.back(); } catch (_) { closeFs(); }
+}
+
 /* ---------- Sự kiện ---------- */
 
 function bind() {
@@ -517,6 +540,12 @@ function bind() {
   $('#zoomIn').addEventListener('click', () => zoomBy(1.25));
   $('#zoomOut').addEventListener('click', () => zoomBy(0.8));
   $('#zoomReset').addEventListener('click', () => { view.fitted = false; drawMap(); });
+
+  // Toàn màn hình: vào / ra + phím Esc + nút Back
+  $('#btnFsEnter').addEventListener('click', enterFs);
+  $('#btnFsExit').addEventListener('click', requestExitFs);
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fsOn) requestExitFs(); });
+  window.addEventListener('popstate', () => { if (fsOn) closeFs(); });
 
   bindPan();
   let rzT; window.addEventListener('resize', () => {

@@ -40,13 +40,19 @@
     </div>
 
     <div id="content" hidden>
-      <section class="panel">
+      <section class="panel panel--map" id="mapPanel">
         <div class="panel__head">
           <h2>Sơ đồ kết nối</h2>
           <div class="zoombar">
             <button class="btn btn--outline btn--icon" id="zoomOut" type="button" aria-label="Thu nhỏ">−</button>
             <button class="btn btn--outline btn--icon" id="zoomReset" type="button" aria-label="Vừa màn hình">Vừa</button>
             <button class="btn btn--outline btn--icon" id="zoomIn" type="button" aria-label="Phóng to">+</button>
+            <button class="btn btn--outline btn--icon" id="btnFsEnter" type="button" aria-label="Toàn màn hình" title="Toàn màn hình">
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7V3h4M13 3h4v4M17 13v4h-4M7 17H3v-4"/></svg>
+            </button>
+            <button class="btn btn--outline btn--icon" id="btnFsExit" type="button" aria-label="Thu nhỏ" title="Thu nhỏ">
+              <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l12 12M16 4L4 16"/></svg>
+            </button>
           </div>
         </div>
         <div class="mapwrap" id="mapWrap">

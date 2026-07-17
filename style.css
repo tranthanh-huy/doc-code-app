@@ -68,7 +68,47 @@ main { padding: 14px 16px 40px; max-width: 960px; margin: 0 auto; }
 .panel { background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; }
 .panel__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 12px 14px; border-bottom: 2px solid var(--ink); }
 .zoombar { display: flex; gap: 6px; }
+/* Biểu tượng trong nút: vẽ bằng SVG (hiện đúng cả trên E Ink), canh giữa. */
+.btn--icon svg { display: block; }
 .hint { font-size: .78rem; color: var(--muted); padding: 8px 14px; border-top: 1px solid var(--line-soft); }
+
+/* ============================================================
+   Chế độ PHÓNG TO sơ đồ ra toàn màn hình (phủ kín khung trình duyệt,
+   không dùng Fullscreen API → chạy được cả iPhone lẫn E Ink).
+   Bật/tắt bằng class .fs trên <body>. Không hiệu ứng động (hợp E Ink).
+   ============================================================ */
+#btnFsExit { display: none; }                 /* nút ✕ chỉ hiện khi đang phóng to */
+body.fs #btnFsEnter { display: none; }
+body.fs #btnFsExit { display: block; }
+
+body.fs { overflow: hidden; }                 /* khoá cuộn nền phía sau */
+body.fs .topbar,
+body.fs .projbar,
+body.fs #emptyState,
+body.fs .panel:not(.panel--map) { display: none !important; }
+
+body.fs .panel--map {
+  position: fixed; inset: 0; z-index: 100;
+  margin: 0; border: 0; border-radius: 0;
+  display: flex; flex-direction: column; background: var(--bg);
+}
+/* Hàng nút nổi ở góc trên phải, né lề an toàn (tai thỏ). */
+body.fs .panel--map .panel__head {
+  position: absolute; top: 0; right: 0; left: auto; z-index: 2;
+  border: 0; padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) 0 0;
+}
+body.fs .panel--map .panel__head h2 { display: none; }
+body.fs .panel--map .zoombar {
+  background: var(--bg); border: 2px solid var(--ink); border-radius: var(--radius); padding: 4px;
+}
+/* Sơ đồ chiếm hết chiều cao còn lại. */
+body.fs .panel--map .mapwrap { flex: 1; height: auto; }
+/* Dòng gợi ý nổi ở đáy. */
+body.fs .panel--map .hint {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 2;
+  background: var(--bg); border-top: 1px solid var(--line-soft);
+  padding-bottom: max(8px, env(safe-area-inset-bottom));
+}
 
 /* Vùng bản đồ: nền trắng trơn (không lưới để tránh bóng ma trên E Ink). */
 .mapwrap {
