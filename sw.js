@@ -1,6 +1,7 @@
-/* Service worker: cache vỏ app để chạy offline.
-   Đổi CACHE mỗi khi sửa app để buộc cập nhật. */
-const CACHE = 'doc-code-app-v17';
+/* Service worker: giữ một bản vỏ app để chạy offline, NHƯNG ưu tiên mạng trước
+   để mở app là thấy bản mới nhất ngay (không phải mở lại 2 lần).
+   Đổi CACHE mỗi khi sửa app. */
+const CACHE = 'doc-code-app-v18';
 const SHELL = [
   './',
   './index.html',
@@ -27,12 +28,15 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   if (req.method !== 'GET') return;
-  // Vỏ app: cache-first. Dữ liệu người dùng nhập không đi qua đây (đọc từ file/localStorage).
+  const url = new URL(req.url);
+  // Chỉ quản VỎ APP (cùng nguồn). Dữ liệu Gist (khác nguồn) để trình duyệt tự lo.
+  if (url.origin !== location.origin) return;
+  // MẠNG TRƯỚC: luôn thử tải bản mới; nếu mất mạng mới dùng bản trong máy.
   e.respondWith(
-    caches.match(req).then((hit) => hit || fetch(req).then((res) => {
+    fetch(req).then((res) => {
       const copy = res.clone();
       caches.open(CACHE).then((c) => c.put(req, copy)).catch(() => {});
       return res;
-    }).catch(() => hit))
+    }).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
   );
 });
