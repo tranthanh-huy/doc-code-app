@@ -70,32 +70,39 @@ async function importAuto(url, { silent = false } = {}) {
   }
 }
 
-// Nạp một mục lục: ghi nhớ link tổng, rồi tải sodo.json của TỪNG dự án bên trong.
+// Hiện một dự án đã có sẵn trong tủ, KHÔNG tải lại (dùng khi vừa tải xong từ mục lục).
+function showProjectFromLib(name) {
+  const lib = loadLib();
+  if (!lib[name]) return;
+  DATA = lib[name]; setCurrent(name);
+  selectedId = null; view.fitted = false;
+  render(); refreshPicker();
+}
+
+// Nạp một mục lục: ghi nhớ link tổng, rồi tải sodo.json của các dự án bên trong —
+// SONG SONG cho nhanh, và hiện dự án đầu tiên tải xong ngay (không chờ hết).
 async function importIndex(idx, url, { silent = false } = {}) {
   setIndexUrl(url);
-  const projs = Array.isArray(idx.projects) ? idx.projects : [];
-  let ok = 0, firstName = null;
-  for (const p of projs) {
-    if (!p || !p.link) continue;
-    try {
-      const data = await fetchSodo(p.link);
-      const name = projName(data);
-      const lib = loadLib(); lib[name] = data; saveLib(lib);
-      setSyncUrl(name, p.link);
-      if (!firstName) firstName = name;
-      ok++;
-    } catch (_) { /* một dự án lỗi thì bỏ qua, vẫn nạp các dự án còn lại */ }
-  }
+  const projs = (Array.isArray(idx.projects) ? idx.projects : []).filter((p) => p && p.link);
+  let shown = false;
+  const results = await Promise.allSettled(projs.map(async (p) => {
+    const data = await fetchSodo(p.link);
+    const name = projName(data);
+    const lib = loadLib(); lib[name] = data; saveLib(lib);
+    setSyncUrl(name, p.link);
+    if (!DATA && !shown) {           // hiện ngay dự án đầu tiên có mặt (không tải lại)
+      shown = true;
+      const cur = getCurrent();
+      showProjectFromLib(loadLib()[cur] ? cur : name);
+    } else {
+      refreshPicker();
+    }
+    return name;
+  }));
+  const ok = results.filter((r) => r.status === 'fulfilled').length;
+  // đang xem sẵn một dự án: cập nhật lại chính nó nếu mục lục có bản mới
+  if (DATA) { const cur = projName(DATA); if (loadLib()[cur]) { DATA = loadLib()[cur]; render(); } }
   refreshPicker();
-  if (!DATA && firstName) {
-    const cur = getCurrent();
-    switchProject(loadLib()[cur] ? cur : firstName);
-  } else if (DATA) {
-    // đang xem một dự án: cập nhật lại chính nó nếu mục lục có bản mới
-    const cur = projName(DATA);
-    if (loadLib()[cur]) { DATA = loadLib()[cur]; render(); }
-    refreshPicker();
-  }
   if (!silent) toast(`Đã đồng bộ mục lục: ${ok}/${projs.length} dự án`);
 }
 
@@ -674,9 +681,15 @@ async function boot() {
   const lib = loadLib();
   const names = Object.keys(lib);
   if (names.length) {
-    if (!DATA) { const cur = getCurrent(); switchProject(lib[cur] ? cur : names[0]); }
-    // Đã có mục lục? Lặng lẽ tải lại để DỰ ÁN MỚI (skill vừa thêm) tự hiện, không cần làm gì.
     const iu = getIndexUrl();
+    if (!DATA) {
+      const cur = getCurrent();
+      const pick = lib[cur] ? cur : names[0];
+      // Có mục lục: hiện bản trong tủ NGAY (khỏi tải), để mục lục tự làm mới bên dưới.
+      // Không có mục lục: switchProject sẽ tự kéo bản mới của riêng dự án đó.
+      if (iu && !syncParam) showProjectFromLib(pick); else switchProject(pick);
+    }
+    // Đã có mục lục? Lặng lẽ tải lại để DỰ ÁN MỚI (skill vừa thêm) tự hiện, không cần làm gì.
     if (iu && !syncParam) importAuto(iu, { silent: true });
     return;
   }
