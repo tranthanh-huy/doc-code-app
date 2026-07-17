@@ -48,6 +48,12 @@ code { border: 1px solid var(--line-soft); padding: 0 .3em; border-radius: 3px; 
 .topbar__left { min-width: 0; }
 .topbar__left h1 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #projectMeta { margin: 2px 0 0; font-size: .78rem; }
+/* Dòng trạng thái đồng bộ: chữ tĩnh, viền rõ, KHÔNG động (hợp E Ink). */
+.sync-status {
+  margin: 4px 0 0; font-size: .74rem; font-weight: 700; color: var(--ink);
+  border: 1px solid var(--ink); border-radius: var(--radius); padding: 1px 7px;
+  display: inline-block; white-space: nowrap;
+}
 .topbar__actions { display: flex; gap: 8px; flex: none; }
 
 .projbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; max-width: 960px; margin: 0 auto; border-bottom: 1px solid var(--line-soft); }

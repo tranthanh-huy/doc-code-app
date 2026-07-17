@@ -39,6 +39,18 @@ function setSyncUrl(name, url) { const m = loadSync(); if (url) m[name] = url; e
 function getIndexUrl() { try { return localStorage.getItem(INDEX_KEY) || ''; } catch (_) { return ''; } }
 function setIndexUrl(u) { try { if (u) localStorage.setItem(INDEX_KEY, u); else localStorage.removeItem(INDEX_KEY); } catch (_) {} }
 
+// Dòng trạng thái đồng bộ — CHỮ TĨNH, không hiệu ứng động (hợp E Ink).
+// sticky=true: giữ nguyên (đang tải); mặc định tự ẩn sau vài giây (đã xong/lỗi).
+let syncClearTimer = null;
+function setSync(text, { sticky = false } = {}) {
+  const e = document.getElementById('syncStatus');
+  if (!e) return;
+  clearTimeout(syncClearTimer);
+  if (!text) { e.hidden = true; e.textContent = ''; return; }
+  e.hidden = false; e.textContent = text;
+  if (!sticky) syncClearTimer = setTimeout(() => { e.hidden = true; e.textContent = ''; }, 3200);
+}
+
 // Tải JSON thô từ một link trực tiếp (có phá cache để luôn lấy bản mới nhất).
 async function fetchJson(url) {
   const u = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
@@ -84,7 +96,10 @@ function showProjectFromLib(name) {
 async function importIndex(idx, url, { silent = false } = {}) {
   setIndexUrl(url);
   const projs = (Array.isArray(idx.projects) ? idx.projects : []).filter((p) => p && p.link);
-  let shown = false;
+  const total = projs.length;
+  if (!total) { setSync(''); if (!silent) toast('Mục lục trống.'); return; }
+  let shown = false, done = 0;
+  setSync('⟳ Đang tải dữ liệu mới…', { sticky: true });
   const results = await Promise.allSettled(projs.map(async (p) => {
     const data = await fetchSodo(p.link);
     const name = projName(data);
@@ -97,27 +112,35 @@ async function importIndex(idx, url, { silent = false } = {}) {
     } else {
       refreshPicker();
     }
+    done++;
+    if (total > 1) setSync(`⟳ Đã tải ${done}/${total} dự án…`, { sticky: true });
     return name;
   }));
   const ok = results.filter((r) => r.status === 'fulfilled').length;
   // đang xem sẵn một dự án: cập nhật lại chính nó nếu mục lục có bản mới
   if (DATA) { const cur = projName(DATA); if (loadLib()[cur]) { DATA = loadLib()[cur]; render(); } }
   refreshPicker();
-  if (!silent) toast(`Đã đồng bộ mục lục: ${ok}/${projs.length} dự án`);
+  if (ok === total) setSync('✓ Đã cập nhật xong');
+  else if (ok === 0) setSync('⚠ Không tải được — sẽ tự thử lại lần mở sau');
+  else setSync(`✓ Cập nhật ${ok}/${total} dự án (vài dự án lỗi)`);
+  if (!silent) toast(`Đã đồng bộ mục lục: ${ok}/${total} dự án`);
 }
 
 // Tải lại dữ liệu mới nhất của một dự án đã gắn link.
 async function refreshProject(name, { silent = false } = {}) {
   const url = getSyncUrl(name);
   if (!url) { if (!silent) toast('Dự án này chưa gắn link đồng bộ.'); return; }
+  setSync('⟳ Đang tải dữ liệu mới…', { sticky: true });
   try {
     const data = await fetchSodo(url);
     const lib = loadLib();
     lib[projName(data)] = data; saveLib(lib);
     if (projName(data) !== name) { setSyncUrl(projName(data), url); }
     if (DATA && projName(DATA) === name) { DATA = data; render(); refreshPicker(); }
+    setSync('✓ Đã cập nhật xong');
     if (!silent) toast('Đã làm mới: ' + name);
   } catch (e) {
+    setSync('⚠ Không tải được — kiểm tra mạng rồi thử lại');
     if (!silent) toast('Không làm mới được: ' + e.message);
   }
 }
