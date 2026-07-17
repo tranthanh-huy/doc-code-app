@@ -54,8 +54,7 @@ of the building before reading every sentence in one room.
 1. **Code just written this session** (if any) → dissect it now; that's when curiosity peaks.
 2. **User specifies** ("explain this file", "I want to understand the login part").
 3. **Skill proposes** based on notes in `ghi-chu.md` and which parts of the map still lack a
-   clear `moTa` (next zone of proximal development). Note: mastery progress lives in the app,
-   not here.
+   clear `moTa` (next zone of proximal development).
 
 ### 2. First time on a project — build the map (split the work)
 
@@ -71,17 +70,17 @@ If `.doc-code/sodo.json` doesn't exist yet, it must be built. **Split the work c
 
 Build the map *while* teaching — never dump a finished map for them to just stare at.
 
-### 3. Who judges mastery — NOT the skill
+### 3. Don't formally grade mastery — `sodo.json` stays structure-only
 
-**The skill does not track or mark mastery.** Progress state (chưa / lơ mơ / vững) is owned
-entirely by the **review app**, stored on the user's device, not in `sodo.json`. Do **not**
-write a `daHoc` field, and do not tell the user "bạn đã vững phần này" as if recording it.
+Your job is to **teach in the moment** (guess-first, correct on the spot), not to keep a
+scorecard. Do **not** write a `daHoc`/progress field into `sodo.json`, and don't announce
+"bạn đã vững phần này" as if recording a grade.
 
-Your job is to **teach in the moment** (guess-first, correct on the spot). The user proves
-mastery to *themselves* later, in the app's flashcard review (recall the answer before
-revealing it, then self-grade). This keeps one clean owner of progress and avoids two tools
-fighting over the same file. When a session ends, point them to the app to review — see
-[End of session](#end-of-session).
+Two reasons to keep `sodo.json` structure-only: it stays a small, portable file the review app
+can just draw, and its node `id`s stay stable when you regenerate the map. If you want to note
+that a part felt shaky or clicked, put that in `ghi-chu.md` (see below) — soft notes for the
+human, not a status baked into the map. The proof of learning is the user **restating a part
+in their own words** (see [End of session](#end-of-session)), not a number anywhere.
 
 ### 4. Pacing and language
 
@@ -108,8 +107,9 @@ so `.gitignore` already covers them.
 ### `sodo.json` — the map (structure only, one self-contained file)
 
 This file is the "contract" with the review app, so keep it **compact, self-contained,
-portable**. It holds **structure only — NO learning/progress state** (that belongs to the
-app). Keep these field names EXACTLY — they are the contract, do not translate them:
+portable**. It holds **structure only** — the map of the project, no learning notes or grades
+(those live in `ghi-chu.md`). Keep these field names EXACTLY — they are the contract, do not
+translate them:
 
 ```json
 {
@@ -140,9 +140,9 @@ app). Keep these field names EXACTLY — they are the contract, do not translate
 
 - `nodes` = the boxes. Each has a stable `id` and an **everyday Vietnamese** `moTa`. `con[]` =
   the function tier inside (multi-tier).
-- **No `daHoc` field.** The app tracks progress itself, keyed by node `id`. So `id` values
-  must be **stable across regenerations** — if you rebuild the map, reuse the same `id` for
-  the same thing, or the user's progress for it is lost.
+- **No `daHoc`/progress field.** Keep `id` values **stable across regenerations** anyway — if
+  you rebuild the map, reuse the same `id` for the same thing, so the user's bearings and any
+  `ghi-chu.md` notes that reference it still line up with the redrawn map.
 - `edges` = arrows. `nhan` explains **why** two nodes connect, not just that they do.
 - **Multi-tier, but default to working at the file level first** (macro-first). Only open the
   function tier (`con`) when the user wants to drill into a node.
@@ -203,26 +203,27 @@ project is sensitive, **ask the user first** before creating or pushing to any G
   exists, run `gh gist edit $(cat .doc-code/gist-id.txt) .doc-code/sodo.json` and remind them
   of the ~30s CDN delay before the app shows the new map. If sync isn't set up yet and they
   want it, walk through "First time enabling sync" once.
-- **Point them to the app to lock it in:** progress is tracked there, so remind them to open
-  the review app and do a flashcard pass (recall each part before revealing) to turn today's
-  reading into lasting memory.
-- If they seem to understand a part, invite them to **restate it in their own words** in one
-  sentence — the surest way for them to feel confident they truly read it, without trusting
-  anyone's word.
+- **Point them to the app to see the whole map:** now that the new map is on the Gist, they
+  can open the review app on any device to look over today's picture as one connected whole —
+  a good way to let it settle.
+- **Lock it in by restating, not by grading:** invite them to **restate a part in their own
+  words** in one sentence — the surest way for them to feel they truly read it, without
+  trusting anyone's word. (There is no score to record; understanding shows in the retelling.)
 
-## Future design notes (review app — NOT built in this skill)
+## The map app (separate project — NOT built in this skill)
 
-For building the app later so it stays compatible — the app is **out of scope** for this
-skill; recorded here only to avoid drift:
+The app lives in its own repo; it's **out of scope** here. Recorded only so this skill keeps
+producing a `sodo.json` the app can read:
 
 - The app is a **PWA** (add-to-home-screen, own icon, fullscreen, offline, auto-updating, no
   browser feel), hosted **free on GitHub Pages** (no self-run server).
-- The app **reads `sodo.json`** (structure only), draws an interactive multi-tier diagram
-  (zoom file ↔ function), and **owns all progress state itself** — stored on the device,
-  keyed by node `id`, set through flashcard review (recall then self-grade). The skill never
-  writes progress. Runs in the browser = **0 tokens**.
+- The app **reads `sodo.json`** (structure only) and draws an interactive multi-tier diagram
+  (zoom file ↔ function) plus a detail list. It is a **read-only viewer** — it does not track
+  learning progress or grade anything (an earlier flashcard/progress feature was removed).
+  Runs in the browser = **0 tokens**.
 - Desktop ↔ phone sync uses a **secret GitHub Gist** (raw link, CORS-friendly), **no** custom
   backend or account. See "Syncing to the review app via a secret Gist" above. (Earlier plan
   was Drive/Dropbox — dropped: Drive blocks CORS.)
 - Therefore `sodo.json` must always stay **one compact, self-contained, portable file**, and
-  node `id`s must stay **stable** so app-side progress survives map regenerations.
+  node `id`s must stay **stable** across regenerations so a redrawn map still matches the
+  user's bearings and their `ghi-chu.md` notes.
