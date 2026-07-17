@@ -247,12 +247,15 @@ function showEmpty(show) {
 
 const NW = 188;  // bề ngang ô
 
+// Tên file thật (đuôi đường dẫn) — để người dùng biết ô này là file nào.
+function baseName(id) { return String(id || '').split('/').pop(); }
+
 // Ước lượng chiều cao ô theo độ dài tên (để chữ không tràn / không đè).
 function nodeH(node) {
   const title = node.ten || node.id || '';
   const lines = Math.max(1, Math.ceil(title.length / 17));
   const hasSub = Array.isArray(node.con) && node.con.length;
-  return 40 + lines * 19 + (hasSub ? 18 : 0);
+  return 40 + lines * 19 + 15 + (hasSub ? 18 : 0);  // +15 cho dòng tên file
 }
 // Khoảng cách từ tâm ô ra mép theo hướng (ux,uy) — để cắt mũi tên đúng mép.
 function borderDist(hw, hh, ux, uy) {
@@ -353,6 +356,7 @@ function drawMap() {
       `<div xmlns="http://www.w3.org/1999/xhtml" class="node__card">
          <div class="node__kind">${escapeHtml(loaiLabel(node.loai))}</div>
          <div class="node__title">${escapeHtml(node.ten || node.id)}</div>
+         <div class="node__file">${escapeHtml(baseName(node.id))}</div>
          ${sub}
        </div>`;
     g.appendChild(fo);
@@ -473,6 +477,7 @@ function areaCard(node) {
   row.innerHTML =
     `<span class="row__main">
        <span class="row__title">${escapeHtml(node.ten || node.id)} <span class="tag">${escapeHtml(loaiLabel(node.loai))}</span></span>
+       <span class="leaf__id">${escapeHtml(node.id)}</span>
        <span class="row__desc">${escapeHtml(node.moTa || '')}</span>
      </span>
      ${hasKids ? '<span class="row__chev">+</span>' : ''}`;

@@ -146,6 +146,8 @@ body.fs .panel--map .hint {
 .node.sel .node__card { border-width: 4px; }
 .node__kind { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
 .node__title { font-weight: 700; font-size: 13px; line-height: 1.25; color: var(--ink); }
+/* Tên file thật, để biết ô này là file nào (không chỉ tên tiếng Việt chế lại). */
+.node__file { font-size: 10px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .node__stat { font-size: 10px; color: var(--muted); margin-top: auto; }
 
 .edge { fill: none; stroke: var(--line-soft); stroke-width: 2; color: var(--line-soft); }
