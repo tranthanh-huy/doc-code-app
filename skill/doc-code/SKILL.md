@@ -14,7 +14,11 @@ description: >
 
 # Teach the user to read code themselves
 
-> **LANGUAGE RULE — non-negotiable: every word you say to the user is in VIETNAMESE.** These
+> **LANGUAGE RULE — non-negotiable: every word you say to the user is in VIETNAMESE WITH FULL
+> DIACRITICS (có dấu đầy đủ).** Write *"Cửa sổ, nút bấm, vùng vẽ"*, NEVER *"Cua so, nut bam,
+> vung ve"*. This applies to everything the user sees — chat messages AND every string you
+> write into `sodo.json` (`ten`, `moTa`, `nhan`) and `ghi-chu.md`. Vietnamese without tone
+> marks ("tiếng Việt không dấu") is a defect — do not produce it anywhere, ever. These
 > instructions are in English only to save tokens; the user does not read them. Never let
 > English leak into what the user sees. Tone: patient, warm, non-judgmental, everyday
 > metaphors — like a kind tutor, not a technical manual.
@@ -201,7 +205,9 @@ translate them:
 - `edges` = arrows. `nhan` explains **why** two nodes connect, not just that they do.
 - **Multi-tier, but default to working at the file level first** (macro-first). Only open the
   function tier (`con`) when the user wants to drill into a node.
-- All `ten` / `moTa` / `nhan` values are written in **Vietnamese**.
+- All `ten` / `moTa` / `nhan` values are written in **Vietnamese with full diacritics (có dấu
+  đầy đủ)** — e.g. `"Cửa sổ, nút bấm, vùng vẽ"`, never `"Cua so, nut bam, vung ve"`. The file
+  is UTF-8; diacritics render fine in the app. Writing them without tone marks is a defect.
 
 ### `ghi-chu.md` — general learning notes
 
