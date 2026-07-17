@@ -56,6 +56,17 @@ code { border: 1px solid var(--line-soft); padding: 0 .3em; border-radius: 3px; 
 }
 .topbar__actions { display: flex; gap: 8px; flex: none; }
 
+/* Màn hẹp (điện thoại): tiêu đề chiếm trọn một hàng (tên không bị cắt cụt),
+   các nút rớt xuống hàng dưới và chia đều — tránh bóp méo như ảnh chụp. */
+@media (max-width: 600px) {
+  .topbar { flex-wrap: wrap; row-gap: 10px; align-items: flex-start; }
+  .topbar__left { flex: 1 1 100%; min-width: 0; }
+  .topbar__left h1 { white-space: normal; overflow: visible; }  /* cho tên xuống dòng, hiện đủ */
+  #projectMeta { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar__actions { width: 100%; flex-wrap: wrap; }
+  .topbar__actions .btn { flex: 1 1 auto; }
+}
+
 .projbar { display: flex; align-items: center; gap: 8px; padding: 10px 16px; max-width: 960px; margin: 0 auto; border-bottom: 1px solid var(--line-soft); }
 .projbar__lbl { font-size: .82rem; font-weight: 700; flex: none; }
 .select {
