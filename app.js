@@ -8,6 +8,9 @@
    ============================================================ */
 
 const SVGNS = 'http://www.w3.org/2000/svg';
+// Địa chỉ nhà CÔNG KHAI của app (không bí mật). Dùng cho QR/link "Chia sẻ" để máy khác
+// luôn với tới được — kể cả khi bản đang mở là file:// hoặc localhost.
+const PUBLIC_APP_URL = 'https://tranthanh-huy.github.io/doc-code-app/';
 const LIB_KEY = 'doc-code:lib';        // { [tênDựÁn]: sodoData } — tủ nhiều dự án
 const CUR_KEY = 'doc-code:current';    // tên dự án đang xem
 const SYNC_KEY = 'doc-code:syncurls';  // { [tênDựÁn]: link tải trực tiếp } — đồng bộ tự động
@@ -500,7 +503,12 @@ function shareLink() {
   const single = (DATA && getSyncUrl(projName(DATA))) || '';
   const target = idx || single; // ưu tiên mục lục; nếu chưa có thì chia sẻ dự án đang xem
   if (!target) return { url: '', isIndex: false };
-  const base = location.origin + location.pathname;
+  // Nếu đang mở từ github.io (https công khai) thì dùng chính nó; nếu mở từ file://
+  // hay localhost thì dùng địa chỉ nhà công khai để máy khác quét được.
+  const here = location.origin + location.pathname;
+  const isPublic = location.protocol === 'https:' &&
+    !/^(localhost|127\.|0\.0\.0\.0|\[?::1)/.test(location.hostname);
+  const base = isPublic ? here : PUBLIC_APP_URL;
   return { url: base + '?sync=' + encodeURIComponent(target), isIndex: !!idx };
 }
 
