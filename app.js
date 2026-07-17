@@ -20,6 +20,7 @@ const OLD_DATA_KEY = 'doc-code:sodo';  // cache đơn cũ (để di cư)
 const $ = (sel) => document.querySelector(sel);
 let DATA = null;
 let selectedId = null;
+let activeNeighborId = null;  // ô hàng xóm có nhãn nối đang hiện (null = chưa hiện nhãn nào)
 let view = { tx: 0, ty: 0, scale: 1, fitted: false };  // pan/zoom tự do bằng transform
 let justPanned = false;  // true nếu vừa kéo/chụm → bỏ qua click chọn ô
 
@@ -308,12 +309,13 @@ function drawMap() {
   const edges = Array.isArray(DATA.edges) ? DATA.edges : [];
   const gEdges = el('g');
   vp.appendChild(gEdges);
-  const pendingLabels = [];
 
   edges.forEach((e) => {
     const a = pos[e.tu], b = pos[e.den];
     if (!a || !b) return;
     const hot = selectedId && (e.tu === selectedId || e.den === selectedId);
+    const neighbor = e.tu === selectedId ? e.den : (e.den === selectedId ? e.tu : null);
+    const active = hot && neighbor === activeNeighborId;
     const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
     const ux = dx / L, uy = dy / L;
     const da = borderDist(NW / 2, heights[e.tu] / 2, ux, uy) + 2;
@@ -321,10 +323,20 @@ function drawMap() {
     const ax = a.x + ux * da, ay = a.y + uy * da;
     const bx = b.x - ux * db, by = b.y - uy * db;
 
-    const path = el('path', { class: 'edge' + (hot ? ' hot' : ''), 'marker-end': 'url(#arrow)' });
+    // Chọn kiểu: đang xem = đậm; nóng-nhưng-không-xem (khi đã có nhãn khác) = dịu; còn lại = nóng/mờ.
+    let cls = 'edge';
+    if (active) cls += ' active';
+    else if (hot) cls += activeNeighborId ? ' dim' : ' hot';
+    const path = el('path', { class: cls, 'marker-end': 'url(#arrow)' });
     path.setAttribute('d', `M ${ax} ${ay} L ${bx} ${by}`);
     gEdges.appendChild(path);
-    if (hot && e.nhan) pendingLabels.push({ x: (ax + bx) / 2, y: (ay + by) / 2, px: -uy, py: ux, text: e.nhan });
+
+    // Dải chạm vô hình bề ngang lớn: mũi tên nhìn thì mảnh, nhưng dễ chạm trúng.
+    if (e.nhan) {
+      const hit = el('path', { class: 'edge-hit', d: `M ${ax} ${ay} L ${bx} ${by}` });
+      hit.addEventListener('click', (ev) => { ev.stopPropagation(); if (justPanned) return; setEdgeActive(e); });
+      gEdges.appendChild(hit);
+    }
   });
 
   top.forEach((node) => {
@@ -344,26 +356,34 @@ function drawMap() {
          ${sub}
        </div>`;
     g.appendChild(fo);
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); if (justPanned) return; selectNode(node.id); });
+    g.addEventListener('click', (ev) => { ev.stopPropagation(); if (justPanned) return; onNodeTap(node.id); });
     vp.appendChild(g);
   });
 
-  // Nhãn mũi tên: đặt có NÉ VA CHẠM — thử giữa, nếu đè ô/nhãn khác thì đẩy lệch cho tới khi trống.
-  const nodeRects = top.map((nd) => ({
-    l: pos[nd.id].x - NW / 2, t: pos[nd.id].y - heights[nd.id] / 2,
-    r: pos[nd.id].x + NW / 2, b: pos[nd.id].y + heights[nd.id] / 2
-  }));
-  const placed = [];
-  pendingLabels.forEach((l) => {
-    const spot = placeLabel(l, nodeRects, placed);
-    drawEdgeLabel(vp, spot.x, spot.y, l.text, spot.w, spot.h);
-    placed.push({ l: spot.x - spot.w / 2, t: spot.y - spot.h / 2, r: spot.x + spot.w / 2, b: spot.y + spot.h / 2 });
-  });
+  // CHỈ MỘT nhãn: nối A–B đang xem. Neo cạnh ô B, lệch về phía A (nằm dọc mũi tên đậm),
+  // né không đè chữ trong ô. Không còn đẩy-lệch rối như trước.
+  if (selectedId && activeNeighborId) {
+    const edge = edges.find((e) =>
+      (e.tu === selectedId && e.den === activeNeighborId) ||
+      (e.den === selectedId && e.tu === activeNeighborId));
+    const A = pos[selectedId], B = pos[activeNeighborId];
+    if (edge && edge.nhan && A && B) {
+      const dx = A.x - B.x, dy = A.y - B.y, L = Math.hypot(dx, dy) || 1;
+      const ux = dx / L, uy = dy / L;
+      const { w, h } = labelSize(edge.nhan);
+      const bDist = borderDist(NW / 2, heights[activeNeighborId] / 2, ux, uy);
+      let off = bDist + h / 2 + 10;                 // ra ngoài mép B một chút
+      off = Math.min(off, Math.max(bDist + h / 2 + 6, L - h / 2 - 10)); // đừng vượt quá phía A
+      drawEdgeLabel(vp, B.x + ux * off, B.y + uy * off, edge.nhan, w, h);
+    }
+  }
 
   svg.onclick = () => { if (!justPanned) selectNode(null); };
-  $('#mapHint').textContent = selectedId
-    ? 'Kéo nền để di chuyển · cuộn/chụm 2 ngón để phóng · chạm nền để bỏ chọn.'
-    : 'Chạm ô để xem kết nối · kéo nền để di chuyển · cuộn/chụm để phóng.';
+  $('#mapHint').textContent = !selectedId
+    ? 'Chạm ô để xem kết nối · kéo nền để di chuyển · cuộn/chụm để phóng.'
+    : (activeNeighborId
+      ? 'Chạm ô đó lần nữa để đi tiếp · chạm ô/mũi tên khác để xem nối khác · chạm nền để bỏ chọn.'
+      : 'Chạm ô hàng xóm (hoặc mũi tên) để xem lý do nối · chạm nền để bỏ chọn.');
 }
 
 function applyTransform(g) {
@@ -382,25 +402,9 @@ function zoomBy(f) {
   zoomAt(f, (wrap.clientWidth || 800) / 2, (wrap.clientHeight || 500) / 2);
 }
 
-function rectsOverlap(a, b) { return !(a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t); }
 function labelSize(text) {
   const lines = Math.max(1, Math.ceil(text.length / 26));
   return { w: 190, h: lines * 16 + 16 };
-}
-function placeLabel(l, nodeRects, placed) {
-  const { w, h } = labelSize(l.text);
-  const px = l.px || 0, py = l.py || 1;
-  const STEP = 14, MAX = 16;
-  for (let k = 0; k <= MAX; k++) {
-    for (const sign of (k === 0 ? [0] : [1, -1])) {
-      const off = k * STEP * sign;
-      const x = l.x + px * off, y = l.y + py * off;
-      const rect = { l: x - w / 2, t: y - h / 2, r: x + w / 2, b: y + h / 2 };
-      const hit = nodeRects.some((r) => rectsOverlap(rect, r)) || placed.some((r) => rectsOverlap(rect, r));
-      if (!hit) return { x, y, w, h };
-    }
-  }
-  return { x: l.x, y: l.y, w, h };
 }
 function drawEdgeLabel(parent, x, y, text, w, h) {
   const LW = w || 190, LH = h || 60;
@@ -412,16 +416,41 @@ function drawEdgeLabel(parent, x, y, text, w, h) {
 function isNeighbor(id, edges, sel) {
   return edges.some((e) => (e.tu === sel && e.den === id) || (e.den === sel && e.tu === id));
 }
-function selectNode(id) {
-  selectedId = (id === selectedId) ? null : id;
-  drawMap();
+function highlightDetail() {
   document.querySelectorAll('.area').forEach((a) => {
     a.classList.toggle('hl', !!selectedId && a.dataset.id === selectedId);
   });
+}
+function selectNode(id) {
+  selectedId = (id === selectedId) ? null : id;
+  activeNeighborId = null;                 // chọn tâm mới thì xoá nhãn đang hiện
+  drawMap();
+  highlightDetail();
   if (selectedId) {
     const card = document.querySelector(`.area[data-id="${cssEsc(selectedId)}"]`);
     if (card) card.scrollIntoView({ behavior: 'auto', block: 'nearest' });
   }
+}
+
+// Máy trạng thái chạm ô (hai chạm để đi tiếp).
+function onNodeTap(id) {
+  const edges = Array.isArray(DATA.edges) ? DATA.edges : [];
+  if (!selectedId || id === selectedId) { selectNode(id); return; }   // chưa chọn / chạm tâm → chọn/bỏ
+  if (isNeighbor(id, edges, selectedId)) {
+    if (activeNeighborId === id) { selectNode(id); }                  // lần 2 → đi tiếp (chọn B)
+    else { activeNeighborId = id; drawMap(); }                        // lần 1 → hiện nhãn A–B
+  } else {
+    selectNode(id);                                                   // ô ở xa → chọn thẳng
+  }
+}
+
+// Chạm dải mũi tên: hiện nhãn nối đó (đặt tâm nếu chưa có tâm là một đầu của nối).
+function setEdgeActive(e) {
+  if (selectedId === e.tu) activeNeighborId = e.den;
+  else if (selectedId === e.den) activeNeighborId = e.tu;
+  else { selectedId = e.tu; activeNeighborId = e.den; }
+  drawMap();
+  highlightDetail();
 }
 
 /* Chi tiết: danh sách khu vực → file → hàm */

@@ -1,7 +1,7 @@
 /* Service worker: giữ một bản vỏ app để chạy offline, NHƯNG ưu tiên mạng trước
    để mở app là thấy bản mới nhất ngay (không phải mở lại 2 lần).
    Đổi CACHE mỗi khi sửa app. */
-const CACHE = 'doc-code-app-v18';
+const CACHE = 'doc-code-app-v19';
 const SHELL = [
   './',
   './index.html',

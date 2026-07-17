@@ -150,6 +150,11 @@ body.fs .panel--map .hint {
 
 .edge { fill: none; stroke: var(--line-soft); stroke-width: 2; color: var(--line-soft); }
 .edge.hot { stroke: var(--ink); stroke-width: 3; color: var(--ink); }
+/* Nối ĐANG XEM: đậm đen nổi bật. Nối nóng còn lại (khi đã xem một cái): dịu hẳn ra sau. */
+.edge.active { stroke: var(--ink); stroke-width: 4; color: var(--ink); }
+.edge.dim { stroke: var(--line-soft); stroke-width: 1.5; color: var(--line-soft); opacity: .4; }
+/* Dải chạm vô hình rộng phủ trên mũi tên: nhìn mảnh nhưng dễ chạm trúng. */
+.edge-hit { fill: none; stroke: transparent; stroke-width: 22; pointer-events: stroke; cursor: pointer; }
 
 .edge-fo { overflow: visible; pointer-events: none; }
 .edge-label { height: 100%; display: flex; align-items: center; justify-content: center; }
