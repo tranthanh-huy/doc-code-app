@@ -7,8 +7,9 @@ description: >
   phụ thuộc AI", "giải thích cấu trúc dự án để tôi TỰ hiểu", "Claude code mà tôi chẳng biết
   gì đang xảy ra", "tôi muốn học đọc code", or types /doc-code — even without the word
   "skill". DIFFERENT from explain-work-simply: that skill EXPLAINS FOR them; this skill
-  TEACHES them to read by making them guess first, then correcting. All output to the user is
-  in Vietnamese, one piece at a time, prioritizing the project's REAL code.
+  TEACHES them to read by answering "what is this + why is it here" for real code — explaining
+  new syntax/APIs, letting them reason where they have footing, never quizzing name trivia. All
+  output to the user is in Vietnamese, one piece at a time, prioritizing the project's REAL code.
 ---
 
 # Teach the user to read code themselves
