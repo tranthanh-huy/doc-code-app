@@ -101,6 +101,10 @@ that moment to **briefly explain what `.gitignore` is** (in Vietnamese: "danh s�
 không đẩy lên kho code chung, vì đây là dữ liệu học của riêng bạn"). A free chance to teach a
 concept.
 
+The folder holds three things: `sodo.json` (the map), `ghi-chu.md` (notes), and — once sync
+is set up — `gist-id.txt` (the secret Gist's id, one line). All three are inside `.doc-code/`
+so `.gitignore` already covers them.
+
 ### `sodo.json` — the map (structure only, one self-contained file)
 
 This file is the "contract" with the review app, so keep it **compact, self-contained,
@@ -150,11 +154,55 @@ Things **not tied to any node**: concepts that just clicked ("hôm nay hiểu 'b
 có tên"), recurring mistakes ("hay lẫn hàm với biến"), learning goals. Markdown, in
 Vietnamese, for the human to read.
 
+## Syncing to the review app via a secret Gist
+
+Goal: after a session, the map appears on the user's phone / E-Ink **by itself** — no manual
+file copying. The mechanism is a **secret GitHub Gist** holding `sodo.json`; the app reads its
+raw link and auto-refreshes. (Decided: Gist, not Drive/Dropbox — Drive blocks CORS; the user
+already has GitHub. A secret Gist is "private unless the link leaks" — the user accepts that.)
+
+**Prerequisite (one-time per machine):** `gh` (GitHub CLI) installed and the user logged in
+(`gh auth status` shows a user). **You never log in for them** — if not logged in, tell them
+in Vietnamese to open a new PowerShell and run `gh auth login` (GitHub.com → HTTPS → login
+with a web browser), then continue. Never handle raw tokens in chat.
+
+### First time enabling sync for a project (do it once, with the user)
+
+1. Make sure `sodo.json` is written to `.doc-code/sodo.json`.
+2. Create the secret Gist and grab its id:
+   `gh gist create .doc-code/sodo.json` → prints a URL ending in the **GIST_ID**.
+   (Gists are secret by default in this `gh` version — do **not** pass `--secret`, it errors.)
+3. Save the id: write that GIST_ID (one line) into `.doc-code/gist-id.txt`.
+4. Build the **raw link** and give it to the user to paste into the app:
+   `https://gist.githubusercontent.com/<user>/<GIST_ID>/raw/sodo.json`
+   (get `<user>` from `gh api user --jq .login`). In the app: **"Từ link…"** → dán link. The
+   app remembers it and auto-refreshes on open — they only paste it once, ever.
+
+### Every session after that (the actual end-of-session push)
+
+If `.doc-code/gist-id.txt` exists, push the fresh map:
+`gh gist edit $(cat .doc-code/gist-id.txt) .doc-code/sodo.json`
+
+**Tell the user (in Vietnamese) about the ~30-second delay:** GitHub's raw link is cached by
+a CDN for roughly half a minute, and the app's cache-buster can't defeat it. So after you
+push, the app may show the old map for up to ~30s — wait a moment, then press **"Làm mới"**
+(or reopen the app) and the new map appears. This is normal, not a bug.
+
+### Security — before pushing, check the project
+
+A secret Gist is only private *while the link stays secret*. For a **sensitive project**
+(e.g. anti-piracy / license code), a secret Gist is acceptable **only if the link is never
+shared** — never post it anywhere public, and never make the Gist public. If unsure whether a
+project is sensitive, **ask the user first** before creating or pushing to any Gist.
+
 ## End of session
 
 - Update `sodo.json` (structure/`moTa` only — **never** a progress field) and `ghi-chu.md`.
-- **State clearly where the file lives:** "`.doc-code/sodo.json`" — so later they know where
-  to grab it to sync to their phone (via Drive/Dropbox) for the review app.
+- **State clearly where the file lives:** "`.doc-code/sodo.json`".
+- **Push to the Gist if sync is set up** (see the section above): if `.doc-code/gist-id.txt`
+  exists, run `gh gist edit $(cat .doc-code/gist-id.txt) .doc-code/sodo.json` and remind them
+  of the ~30s CDN delay before the app shows the new map. If sync isn't set up yet and they
+  want it, walk through "First time enabling sync" once.
 - **Point them to the app to lock it in:** progress is tracked there, so remind them to open
   the review app and do a flashcard pass (recall each part before revealing) to turn today's
   reading into lasting memory.
@@ -173,7 +221,8 @@ skill; recorded here only to avoid drift:
   (zoom file ↔ function), and **owns all progress state itself** — stored on the device,
   keyed by node `id`, set through flashcard review (recall then self-grade). The skill never
   writes progress. Runs in the browser = **0 tokens**.
-- Desktop ↔ phone sync uses the user's **existing Drive/Dropbox/OneDrive** (put `.doc-code/`
-  inside / pointing at a synced folder), **no** custom backend or account.
+- Desktop ↔ phone sync uses a **secret GitHub Gist** (raw link, CORS-friendly), **no** custom
+  backend or account. See "Syncing to the review app via a secret Gist" above. (Earlier plan
+  was Drive/Dropbox — dropped: Drive blocks CORS.)
 - Therefore `sodo.json` must always stay **one compact, self-contained, portable file**, and
   node `id`s must stay **stable** so app-side progress survives map regenerations.

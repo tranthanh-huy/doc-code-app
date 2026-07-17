@@ -37,31 +37,34 @@ Hai thứ đi kèm nhau, giúp người dùng **tự đọc code** để bớt p
     mới khi mở app / khi đổi dự án**; nút "Làm mới" tải tay. Link hỏng báo lỗi tử tế.
 - **CORS đã kiểm tra**: app tải được từ hạ tầng GitHub raw → Gist chắc chắn hoạt động.
 
-## 4. ĐANG DỞ — mắt xích cuối: tự động đồng bộ máy tính ↔ điện thoại/E Ink
+## 4. Mắt xích cuối — đồng bộ máy tính ↔ điện thoại/E Ink qua Gist bí mật — ĐÃ XONG (2026-07-17)
 
 **Mục tiêu:** học xong → skill tự đẩy `sodo.json` lên **Gist bí mật** → mở app ở máy khác là
-**tự thấy bản mới** (không tải, không nhập tay).
+**tự thấy bản mới** (không tải, không nhập tay). Đã chốt: dùng **secret Gist** (Drive bị chặn
+CORS; người dùng chọn Gist vì tái dùng GitHub sẵn có, CORS ổn định).
 
-Đã chốt (đừng bàn lại): dùng **secret Gist** (không phải Drive — Drive bị chặn CORS; không
-phải Dropbox — người dùng đã chọn Gist vì tái dùng GitHub sẵn có, CORS ổn định).
+**Đã làm xong & test đầu-cuối trên máy mới (đăng nhập `gh` sẵn, tài khoản `tranthanh-huy`):**
 
-**Phần app: XONG.** Phần còn thiếu = **skill tự đẩy lên Gist**. Các bước tiếp theo:
+- Tạo Gist bí mật bằng `gh gist create <file>` (LƯU Ý: `gh` bản này KHÔNG có cờ `--secret` —
+  gist mặc định đã bí mật; đừng dùng `--secret` kẻo lỗi).
+- Link raw `https://gist.githubusercontent.com/<user>/<GIST_ID>/raw/<file>` trả **200 +
+  `Access-Control-Allow-Origin: *`** → app trên GitHub Pages tải được.
+- Trong app thật: gọi luồng "Từ link…" → app nhập, lưu vào tủ, **gắn link đồng bộ** (tự làm
+  mới lần sau). Sơ đồ vẽ đúng 3 node / 2 edge.
+- `gh gist edit <ID> <file>` đẩy bản mới OK (API xác nhận).
+- **CAVEAT quan trọng — CDN cache ~15–30 giây:** link raw của Gist bị CDN (Fastly) cache; tham
+  số `?t=` của app KHÔNG phá được. Sau khi đẩy, app có thể thấy bản CŨ tới ~30s → chờ chút rồi
+  bấm **"Làm mới"** là ra bản mới. Bình thường, không phải lỗi. (Đã ghi vào skill.)
 
-1. **Cài `gh` (GitHub CLI)** nếu máy mới chưa có: `winget install --id GitHub.cli -e`.
-   (Máy cũ đã cài `gh` 2.96 nhưng auth theo máy, không theo bạn → máy mới phải đăng nhập lại.)
-2. **Người dùng tự đăng nhập** (Claude KHÔNG đăng nhập thay): họ mở PowerShell mới, chạy
-   `gh auth login` → GitHub.com → HTTPS → Yes → Login with a web browser → nhập mã vào trình
-   duyệt → Authorize. (Không dùng token dán vào chat — không xử lý credential thô.)
-3. Kiểm tra: `gh auth status`.
-4. **Tạo Gist bí mật thử** cho dự án KHÔNG nhạy cảm trước (todo demo):
-   `gh gist create --secret <đường-dẫn>/sodo.json`. Lấy **link raw**:
-   `https://gist.githubusercontent.com/<user>/<GIST_ID>/raw/sodo.json`.
-5. Trong app bấm **"Từ link…"**, dán link raw → app nhập + tự đồng bộ. Chạy thử trọn vòng
-   (sửa file → `gh gist edit <ID> <file>` → bấm "Làm mới" trong app thấy đổi).
-6. **Cập nhật skill**: thêm bước cuối buổi — nếu dự án đã có Gist thì chạy
-   `gh gist edit <ID> .doc-code/sodo.json` để đẩy bản mới. Lưu `GIST_ID` ở đâu đó cạnh dự án
-   (ví dụ `.doc-code/gist-id.txt`, nhớ .gitignore).
-7. Làm tương tự cho `license-tool` — NHƯNG xem mục Bảo mật.
+**Gist demo (dữ liệu bịa, an toàn):** `GIST_ID = dacc1b9bc4367c85af83a267d0642055`
+(từ `sample-sodo.json`). Xoá lúc nào cũng được: `gh gist delete <ID>`.
+
+**Skill đã cập nhật** để tự làm việc này: có mục "Syncing to the review app via a secret Gist"
+(cài đặt 1 lần + đẩy cuối mỗi buổi bằng `gh gist edit $(cat .doc-code/gist-id.txt)
+.doc-code/sodo.json`, lưu id ở `.doc-code/gist-id.txt`). Đã cài bản mới vào
+`~/.claude/skills/doc-code/SKILL.md` trên máy này.
+
+**Còn lại:** làm tương tự cho `license-tool` — NHƯNG xem mục Bảo mật (đừng để lộ link).
 
 ## 5. Quyết định thiết kế đã chốt (embedded — vì memory không theo máy)
 
@@ -96,5 +99,10 @@ phải Dropbox — người dùng đã chọn Gist vì tái dùng GitHub sẵn c
 ## 8. Việc nhỏ còn treo
 
 - Loạt commit gần đây đã đẩy hết lên GitHub (xem `git log`).
-- Chưa cài đặt đồng bộ Gist cho bất kỳ dự án nào (mục 4).
+- Mắt xích Gist ĐÃ XONG + test (mục 4). Mới chỉ có Gist DEMO (todo bịa); chưa gắn Gist cho
+  dự án thật nào của người dùng — làm khi họ học dự án thật.
+- **Chưa làm Gist cho `license-tool`** (nhạy cảm) — làm khi cần, giữ link bí mật (mục 7).
+- **Drift cần người dùng quyết:** skill vẫn nhắc "ôn tập flashcard" (mục 3 & End of session)
+  nhưng app đã GỠ flashcard/tiến-độ. Hoặc bỏ nhắc flashcard trong skill, hoặc làm lại tính
+  năng ôn tập trong app — hỏi người dùng muốn hướng nào trước khi sửa.
 - Nếu muốn, sau này thêm "ôn tập" phiên bản người dùng thích (đã gỡ flashcard).
