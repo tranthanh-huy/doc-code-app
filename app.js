@@ -1,57 +1,23 @@
 'use strict';
 
 /* ============================================================
-   Bản đồ đọc code — app xem & ôn sơ đồ sinh ra từ skill doc-code.
-
-   Kiến trúc (đã chốt): sodo.json chỉ chứa CẤU TRÚC (không có trạng thái học).
-   TRẠNG THÁI học (chưa/lơ mơ/vững) do CHÍNH APP giữ, lưu trong localStorage,
-   gắn theo project + id của từng ô. App tự chấm qua chế độ LẬT THẺ (nhớ trước,
-   lật sau, tự đánh giá) — skill không đụng vào trạng thái.
+   Bản đồ đọc code — app xem sơ đồ cấu trúc dự án (sinh từ skill doc-code).
+   Đọc sodo.json (chỉ CẤU TRÚC), vẽ sơ đồ kết nối tương tác + danh sách chi tiết.
+   Giao diện tối giản đen–trắng, hợp cả điện thoại lẫn màn hình E Ink.
+   (Chức năng ôn tập/tiến độ tạm gỡ — sẽ dựng lại theo cách người dùng muốn.)
    ============================================================ */
 
 const SVGNS = 'http://www.w3.org/2000/svg';
-const LIB_KEY = 'doc-code:lib';       // { [tênDựÁn]: sodoData } — tủ nhiều dự án
-const CUR_KEY = 'doc-code:current';   // tên dự án đang xem
+const LIB_KEY = 'doc-code:lib';        // { [tênDựÁn]: sodoData } — tủ nhiều dự án
+const CUR_KEY = 'doc-code:current';    // tên dự án đang xem
+const SYNC_KEY = 'doc-code:syncurls';  // { [tênDựÁn]: link tải trực tiếp } — đồng bộ tự động
 const OLD_DATA_KEY = 'doc-code:sodo';  // cache đơn cũ (để di cư)
-const PROG_PREFIX = 'doc-code:progress:';
-const STATE_LABEL = { chua: 'chưa', lomo: 'lơ mơ', vung: 'vững' };
 
 const $ = (sel) => document.querySelector(sel);
-let DATA = null;         // sodo.json (chỉ cấu trúc)
-let PROGRESS = {};       // { [id]: 'chua'|'lomo'|'vung' } của dự án hiện tại
+let DATA = null;
 let selectedId = null;
-let zoom = 1;
-
-/* ---------- Trạng thái học (app tự giữ) ---------- */
-
-function progKey() { return PROG_PREFIX + (DATA && DATA.project ? DATA.project : '_'); }
-function loadProgress() {
-  try { const s = localStorage.getItem(progKey()); PROGRESS = s ? JSON.parse(s) : {}; }
-  catch (_) { PROGRESS = {}; }
-}
-function saveProgress() {
-  try { localStorage.setItem(progKey(), JSON.stringify(PROGRESS)); } catch (_) {}
-}
-function getState(id) { return PROGRESS[id] || 'chua'; }
-function setState(id, st) { PROGRESS[id] = st; saveProgress(); }
-
-// Chuẩn hoá giá trị daHoc cũ (nếu file cũ còn) để nhập một lần rồi thôi.
-function normState(v) {
-  const s = (v || '').toString().toLowerCase().trim();
-  if (s.startsWith('v')) return 'vung';
-  if (s.startsWith('l')) return 'lomo';
-  return 'chua';
-}
-// Di cư nhẹ: nếu file cũ còn 'daHoc' và app chưa có trạng thái cho ô đó → nhập vào.
-function seedFromLegacy(nodes) {
-  let changed = false;
-  const walk = (arr) => arr.forEach((n) => {
-    if (n && n.daHoc != null && PROGRESS[n.id] == null) { PROGRESS[n.id] = normState(n.daHoc); changed = true; }
-    if (Array.isArray(n.con)) walk(n.con);
-  });
-  walk(nodes);
-  if (changed) saveProgress();
-}
+let view = { tx: 0, ty: 0, scale: 1, fitted: false };  // pan/zoom tự do bằng transform
+let justPanned = false;  // true nếu vừa kéo/chụm → bỏ qua click chọn ô
 
 /* ---------- Tủ nhiều dự án ---------- */
 
@@ -61,7 +27,48 @@ function getCurrent() { try { return localStorage.getItem(CUR_KEY) || ''; } catc
 function setCurrent(name) { try { localStorage.setItem(CUR_KEY, name); } catch (_) {} }
 function projName(data) { return (data && data.project) ? data.project : 'sơ đồ không tên'; }
 
-/* ---------- Nạp / lưu dữ liệu ---------- */
+function loadSync() { try { const s = localStorage.getItem(SYNC_KEY); return s ? JSON.parse(s) : {}; } catch (_) { return {}; } }
+function saveSync(m) { try { localStorage.setItem(SYNC_KEY, JSON.stringify(m)); } catch (_) {} }
+function getSyncUrl(name) { return loadSync()[name] || ''; }
+function setSyncUrl(name, url) { const m = loadSync(); if (url) m[name] = url; else delete m[name]; saveSync(m); }
+
+// Tải sodo.json từ một link trực tiếp (có phá cache để luôn lấy bản mới nhất).
+async function fetchSodo(url) {
+  const u = url + (url.includes('?') ? '&' : '?') + 't=' + Date.now();
+  const res = await fetch(u, { cache: 'no-store' });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return validate(await res.json());
+}
+
+// Nhập một dự án bằng link + ghi nhớ link để lần sau tự làm mới.
+async function importFromUrl(url) {
+  url = (url || '').trim();
+  if (!url) return;
+  try {
+    const data = await fetchSodo(url);
+    setSyncUrl(projName(data), url);
+    useData(data, { addToLib: true });
+    toast('Đã nhập & gắn link: ' + projName(data));
+  } catch (e) {
+    toast('Nhập từ link lỗi: ' + e.message + ' — hãy dùng link TẢI TRỰC TIẾP.');
+  }
+}
+
+// Tải lại dữ liệu mới nhất của một dự án đã gắn link.
+async function refreshProject(name, { silent = false } = {}) {
+  const url = getSyncUrl(name);
+  if (!url) { if (!silent) toast('Dự án này chưa gắn link đồng bộ.'); return; }
+  try {
+    const data = await fetchSodo(url);
+    const lib = loadLib();
+    lib[projName(data)] = data; saveLib(lib);
+    if (projName(data) !== name) { setSyncUrl(projName(data), url); }
+    if (DATA && projName(DATA) === name) { DATA = data; render(); refreshPicker(); }
+    if (!silent) toast('Đã làm mới: ' + name);
+  } catch (e) {
+    if (!silent) toast('Không làm mới được: ' + e.message);
+  }
+}
 
 function validate(data) {
   if (!data || typeof data !== 'object') throw new Error('File không phải JSON hợp lệ.');
@@ -79,12 +86,22 @@ function useData(data, { addToLib = true } = {}) {
     saveLib(lib);
     setCurrent(projName(DATA));
   }
-  loadProgress();
-  seedFromLegacy(DATA.nodes);
   selectedId = null;
+  view.fitted = false;
   render();
   refreshPicker();
   toast(`Đã nạp: ${projName(DATA)}`);
+}
+
+function importFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try { useData(JSON.parse(reader.result)); }
+    catch (err) { toast('Không đọc được file: ' + err.message); }
+  };
+  reader.onerror = () => toast('Lỗi khi mở file.');
+  reader.readAsText(file);
 }
 
 function refreshPicker() {
@@ -107,11 +124,11 @@ function switchProject(name) {
   if (!lib[name]) return;
   DATA = lib[name];
   setCurrent(name);
-  loadProgress();
-  seedFromLegacy(DATA.nodes);
   selectedId = null;
+  view.fitted = false;
   render();
   refreshPicker();
+  if (getSyncUrl(name)) refreshProject(name, { silent: true });  // tự lấy bản mới nhất ngầm
 }
 
 function deleteProject(name) {
@@ -119,44 +136,18 @@ function deleteProject(name) {
   if (!lib[name]) return;
   delete lib[name];
   saveLib(lib);
+  setSyncUrl(name, '');  // xoá luôn link đồng bộ
   const rest = Object.keys(lib);
   if (rest.length) { switchProject(rest[0]); toast(`Đã xoá "${name}" khỏi tủ`); }
   else { DATA = null; setCurrent(''); showEmpty(true); refreshPicker(); toast(`Đã xoá "${name}". Tủ trống.`); }
 }
 
-function importFromFile(file) {
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    try { useData(JSON.parse(reader.result)); }
-    catch (err) { toast('Không đọc được file: ' + err.message); }
-  };
-  reader.onerror = () => toast('Lỗi khi mở file.');
-  reader.readAsText(file);
-}
+/* ---------- Đếm ---------- */
 
-/* ---------- Đếm & duyệt ---------- */
-
-function flatten(nodes, parentTen, acc = []) {
-  for (const n of nodes) {
-    acc.push({ node: n, parentTen });
-    if (Array.isArray(n.con) && n.con.length) flatten(n.con, n.ten || n.id, acc);
-  }
-  return acc;
-}
-function countStates() {
-  const acc = { chua: 0, lomo: 0, vung: 0, total: 0 };
-  flatten(DATA.nodes).forEach(({ node }) => { acc.total++; acc[getState(node.id)]++; });
-  return acc;
-}
-function childCount(node, acc = { total: 0, vung: 0 }) {
-  if (!Array.isArray(node.con)) return acc;
-  for (const c of node.con) {
-    acc.total++;
-    if (getState(c.id) === 'vung') acc.vung++;
-    childCount(c, acc);
-  }
-  return acc;
+function childCountTotal(node, acc = { n: 0 }) {
+  if (!Array.isArray(node.con)) return acc.n;
+  for (const c of node.con) { acc.n++; childCountTotal(c, acc); }
+  return acc.n;
 }
 
 /* ---------- Vẽ ---------- */
@@ -164,19 +155,11 @@ function childCount(node, acc = { total: 0, vung: 0 }) {
 function render() {
   if (!DATA) { showEmpty(true); return; }
   showEmpty(false);
-
   $('#projectName').textContent = DATA.project || 'Bản đồ đọc code';
-  const c = countStates();
-  const metaBits = [];
-  if (DATA.ngayTao) metaBits.push('cập nhật ' + DATA.ngayTao);
-  metaBits.push(`${c.total} phần`);
-  $('#projectMeta').textContent = metaBits.join(' · ');
-
-  const pct = c.total ? Math.round((c.vung / c.total) * 100) : 0;
-  $('#progressWrap').hidden = false;
-  $('#progressFill').style.width = pct + '%';
-  $('#progressLabel').textContent = `Đã vững ${c.vung}/${c.total} phần (${pct}%) · lơ mơ ${c.lomo} · chưa ${c.chua}`;
-
+  const meta = [];
+  if (DATA.ngayTao) meta.push('cập nhật ' + DATA.ngayTao);
+  meta.push(`${DATA.nodes.length} phần chính`);
+  $('#projectMeta').textContent = meta.join(' · ');
   drawMap();
   drawDetail();
 }
@@ -184,7 +167,22 @@ function render() {
 function showEmpty(show) {
   $('#emptyState').hidden = !show;
   $('#content').hidden = show;
-  $('#progressWrap').hidden = show;
+}
+
+const NW = 188;  // bề ngang ô
+
+// Ước lượng chiều cao ô theo độ dài tên (để chữ không tràn / không đè).
+function nodeH(node) {
+  const title = node.ten || node.id || '';
+  const lines = Math.max(1, Math.ceil(title.length / 17));
+  const hasSub = Array.isArray(node.con) && node.con.length;
+  return 40 + lines * 19 + (hasSub ? 18 : 0);
+}
+// Khoảng cách từ tâm ô ra mép theo hướng (ux,uy) — để cắt mũi tên đúng mép.
+function borderDist(hw, hh, ux, uy) {
+  const tx = ux ? hw / Math.abs(ux) : Infinity;
+  const ty = uy ? hh / Math.abs(uy) : Infinity;
+  return Math.min(tx, ty);
 }
 
 function drawMap() {
@@ -193,15 +191,37 @@ function drawMap() {
   const top = DATA.nodes;
   const n = top.length;
 
-  const NW = 172, NH = 96;
-  const W = Math.max(560, n * 150);
-  const H = Math.max(460, n * 120);
-  const cx = W / 2, cy = H / 2;
-  const R = Math.max(140, Math.min(W, H) / 2 - NH);
+  const heights = {};
+  top.forEach((nd) => { heights[nd.id] = nodeH(nd); });
+  const maxNH = Math.max(96, ...Object.values(heights));
 
-  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
-  svg.style.maxWidth = (W * zoom) + 'px';
-  svg.style.minWidth = Math.min(W, 320) + 'px';
+  const GAP = 150;
+  let R = 160;
+  if (n > 1) R = Math.max(160, (NW + GAP) / (2 * Math.sin(Math.PI / n)));
+  const M = 90;
+  const W = Math.round(2 * R + NW + 2 * M);
+  const H = Math.round(2 * R + maxNH + 2 * M);
+  const cx = W / 2, cy = H / 2;
+
+  const wrap = $('#mapWrap');
+  const VW = Math.max(320, wrap.clientWidth || 800);
+  const VH = Math.max(280, wrap.clientHeight || 500);
+  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
+
+  if (!view.fitted) {
+    const s = Math.min(VW / W, VH / H) * 0.92;
+    view.scale = s; view.tx = (VW - W * s) / 2; view.ty = (VH - H * s) / 2; view.fitted = true;
+  }
+
+  const defs = el('defs');
+  defs.innerHTML =
+    `<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+       <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>`;
+  svg.appendChild(defs);
+
+  const vp = el('g', { id: 'viewport' });
+  svg.appendChild(vp);
+  applyTransform(vp);
 
   const pos = {};
   top.forEach((node, i) => {
@@ -210,74 +230,113 @@ function drawMap() {
     pos[node.id] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) };
   });
 
-  const defs = el('defs');
-  defs.innerHTML =
-    `<marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-       <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker>`;
-  svg.appendChild(defs);
-
   const edges = Array.isArray(DATA.edges) ? DATA.edges : [];
   const gEdges = el('g');
-  svg.appendChild(gEdges);
-  const pendingLabels = [];  // vẽ sau cùng để nằm ĐÈ lên node
+  vp.appendChild(gEdges);
+  const pendingLabels = [];
 
   edges.forEach((e) => {
     const a = pos[e.tu], b = pos[e.den];
     if (!a || !b) return;
     const hot = selectedId && (e.tu === selectedId || e.den === selectedId);
+    const dx = b.x - a.x, dy = b.y - a.y, L = Math.hypot(dx, dy) || 1;
+    const ux = dx / L, uy = dy / L;
+    const da = borderDist(NW / 2, heights[e.tu] / 2, ux, uy) + 2;
+    const db = borderDist(NW / 2, heights[e.den] / 2, ux, uy) + 7;
+    const ax = a.x + ux * da, ay = a.y + uy * da;
+    const bx = b.x - ux * db, by = b.y - uy * db;
+
     const path = el('path', { class: 'edge' + (hot ? ' hot' : ''), 'marker-end': 'url(#arrow)' });
-    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
-    const dx = mx - cx, dy = my - cy, len = Math.hypot(dx, dy) || 1;
-    const cxp = mx + (dx / len) * 26, cyp = my + (dy / len) * 26;
-    path.setAttribute('d', `M ${a.x} ${a.y} Q ${cxp} ${cyp} ${b.x} ${b.y}`);
-    path.style.color = hot ? '' : 'var(--muted)';
+    path.setAttribute('d', `M ${ax} ${ay} L ${bx} ${by}`);
     gEdges.appendChild(path);
-    if (hot && e.nhan) pendingLabels.push({ x: cxp, y: cyp, text: e.nhan });
+    if (hot && e.nhan) pendingLabels.push({ x: (ax + bx) / 2, y: (ay + by) / 2, px: -uy, py: ux, text: e.nhan });
   });
 
   top.forEach((node) => {
     const p = pos[node.id];
-    const st = getState(node.id);
+    const h = heights[node.id];
     const isSel = node.id === selectedId;
     const dim = selectedId && !isSel && !isNeighbor(node.id, edges, selectedId);
 
     const g = el('g', { class: 'node' + (isSel ? ' sel' : '') + (dim ? ' dim' : '') });
-    const fo = el('foreignObject', { x: p.x - NW / 2, y: p.y - NH / 2, width: NW, height: NH, class: 'node__box' });
-    const kids = childCount(node);
-    const statLine = kids.total ? `${kids.vung}/${kids.total} phần trong đây đã vững` : STATE_LABEL[st];
+    const fo = el('foreignObject', { x: p.x - NW / 2, y: p.y - h / 2, width: NW, height: h, class: 'node__box' });
+    const kids = childCountTotal(node);
+    const sub = kids ? `<div class="node__stat">${kids} mục bên trong</div>` : '';
     fo.innerHTML =
-      `<div xmlns="http://www.w3.org/1999/xhtml" class="node__card s-${st}">
+      `<div xmlns="http://www.w3.org/1999/xhtml" class="node__card">
          <div class="node__kind">${escapeHtml(loaiLabel(node.loai))}</div>
          <div class="node__title">${escapeHtml(node.ten || node.id)}</div>
-         <div class="node__stat">${escapeHtml(statLine)}</div>
+         ${sub}
        </div>`;
     g.appendChild(fo);
-    g.addEventListener('click', (ev) => { ev.stopPropagation(); selectNode(node.id); });
-    svg.appendChild(g);
+    g.addEventListener('click', (ev) => { ev.stopPropagation(); if (justPanned) return; selectNode(node.id); });
+    vp.appendChild(g);
   });
 
-  // Nhãn mũi tên vẽ SAU CÙNG → nằm đè lên node, không bị che, chữ đầy đủ.
-  pendingLabels.forEach((l) => drawEdgeLabel(svg, l.x, l.y, l.text));
+  // Nhãn mũi tên: đặt có NÉ VA CHẠM — thử giữa, nếu đè ô/nhãn khác thì đẩy lệch cho tới khi trống.
+  const nodeRects = top.map((nd) => ({
+    l: pos[nd.id].x - NW / 2, t: pos[nd.id].y - heights[nd.id] / 2,
+    r: pos[nd.id].x + NW / 2, b: pos[nd.id].y + heights[nd.id] / 2
+  }));
+  const placed = [];
+  pendingLabels.forEach((l) => {
+    const spot = placeLabel(l, nodeRects, placed);
+    drawEdgeLabel(vp, spot.x, spot.y, l.text, spot.w, spot.h);
+    placed.push({ l: spot.x - spot.w / 2, t: spot.y - spot.h / 2, r: spot.x + spot.w / 2, b: spot.y + spot.h / 2 });
+  });
 
-  svg.onclick = () => selectNode(null);
+  svg.onclick = () => { if (!justPanned) selectNode(null); };
   $('#mapHint').textContent = selectedId
-    ? 'Đường xanh là các kết nối của ô đang chọn. Chạm nền để bỏ chọn.'
-    : 'Chạm vào một ô để xem nó nối với ai và vì sao.';
+    ? 'Kéo nền để di chuyển · cuộn/chụm 2 ngón để phóng · chạm nền để bỏ chọn.'
+    : 'Chạm ô để xem kết nối · kéo nền để di chuyển · cuộn/chụm để phóng.';
 }
 
-// Nhãn mũi tên: dùng foreignObject để chữ TỰ XUỐNG DÒNG đầy đủ, có nền, không cắt cụt.
-function drawEdgeLabel(parent, x, y, text) {
-  const LW = 190, LH = 96;
+function applyTransform(g) {
+  g = g || document.getElementById('viewport');
+  if (g) g.setAttribute('transform', `translate(${view.tx} ${view.ty}) scale(${view.scale})`);
+}
+function zoomAt(f, px, py) {
+  const wx = (px - view.tx) / view.scale, wy = (py - view.ty) / view.scale;
+  view.scale = Math.min(4, Math.max(0.2, view.scale * f));
+  view.tx = px - wx * view.scale;
+  view.ty = py - wy * view.scale;
+  applyTransform();
+}
+function zoomBy(f) {
+  const wrap = $('#mapWrap');
+  zoomAt(f, (wrap.clientWidth || 800) / 2, (wrap.clientHeight || 500) / 2);
+}
+
+function rectsOverlap(a, b) { return !(a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t); }
+function labelSize(text) {
+  const lines = Math.max(1, Math.ceil(text.length / 26));
+  return { w: 190, h: lines * 16 + 16 };
+}
+function placeLabel(l, nodeRects, placed) {
+  const { w, h } = labelSize(l.text);
+  const px = l.px || 0, py = l.py || 1;
+  const STEP = 14, MAX = 16;
+  for (let k = 0; k <= MAX; k++) {
+    for (const sign of (k === 0 ? [0] : [1, -1])) {
+      const off = k * STEP * sign;
+      const x = l.x + px * off, y = l.y + py * off;
+      const rect = { l: x - w / 2, t: y - h / 2, r: x + w / 2, b: y + h / 2 };
+      const hit = nodeRects.some((r) => rectsOverlap(rect, r)) || placed.some((r) => rectsOverlap(rect, r));
+      if (!hit) return { x, y, w, h };
+    }
+  }
+  return { x: l.x, y: l.y, w, h };
+}
+function drawEdgeLabel(parent, x, y, text, w, h) {
+  const LW = w || 190, LH = h || 60;
   const fo = el('foreignObject', { x: x - LW / 2, y: y - LH / 2, width: LW, height: LH, class: 'edge-fo' });
-  fo.innerHTML =
-    `<div xmlns="http://www.w3.org/1999/xhtml" class="edge-label2"><span>${escapeHtml(text)}</span></div>`;
+  fo.innerHTML = `<div xmlns="http://www.w3.org/1999/xhtml" class="edge-label"><span>${escapeHtml(text)}</span></div>`;
   parent.appendChild(fo);
 }
 
 function isNeighbor(id, edges, sel) {
   return edges.some((e) => (e.tu === sel && e.den === id) || (e.den === sel && e.tu === id));
 }
-
 function selectNode(id) {
   selectedId = (id === selectedId) ? null : id;
   drawMap();
@@ -286,11 +345,11 @@ function selectNode(id) {
   });
   if (selectedId) {
     const card = document.querySelector(`.area[data-id="${cssEsc(selectedId)}"]`);
-    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    if (card) card.scrollIntoView({ behavior: 'auto', block: 'nearest' });
   }
 }
 
-/* Chi tiết: accordion khu vực → file → hàm */
+/* Chi tiết: danh sách khu vực → file → hàm */
 function drawDetail() {
   const wrap = $('#detail');
   wrap.innerHTML = '';
@@ -307,12 +366,11 @@ function areaCard(node) {
   row.type = 'button';
   row.setAttribute('aria-expanded', 'false');
   row.innerHTML =
-    `<span class="row__badge b-${getState(node.id)}"></span>
-     <span class="row__main">
-       <span class="row__title">${escapeHtml(node.ten || node.id)}<span class="tag">${escapeHtml(loaiLabel(node.loai))}</span></span>
+    `<span class="row__main">
+       <span class="row__title">${escapeHtml(node.ten || node.id)} <span class="tag">${escapeHtml(loaiLabel(node.loai))}</span></span>
        <span class="row__desc">${escapeHtml(node.moTa || '')}</span>
      </span>
-     ${hasKids ? '<span class="row__chev">▸</span>' : ''}`;
+     ${hasKids ? '<span class="row__chev">+</span>' : ''}`;
   box.appendChild(row);
 
   if (hasKids) {
@@ -323,6 +381,7 @@ function areaCard(node) {
     row.addEventListener('click', () => {
       const open = row.getAttribute('aria-expanded') === 'true';
       row.setAttribute('aria-expanded', String(!open));
+      row.querySelector('.row__chev').textContent = open ? '+' : '−';
       kidsWrap.hidden = open;
     });
   } else {
@@ -340,87 +399,12 @@ function leafOrArea(node) {
   const leaf = hel('div', { class: 'leaf' });
   leaf.dataset.id = node.id;
   leaf.innerHTML =
-    `<span class="row__badge b-${getState(node.id)}"></span>
-     <span class="row__main">
-       <span class="row__title">${escapeHtml(node.ten || node.id)}<span class="tag">${escapeHtml(loaiLabel(node.loai))}</span></span>
+    `<span class="row__main">
+       <span class="row__title">${escapeHtml(node.ten || node.id)} <span class="tag">${escapeHtml(loaiLabel(node.loai))}</span></span>
        <span class="leaf__id">${escapeHtml(node.id)}</span>
        <span class="row__desc">${escapeHtml(node.moTa || '')}</span>
      </span>`;
   return leaf;
-}
-
-/* ---------- Ôn tập: LẬT THẺ (nhớ trước, lật sau, tự chấm) ---------- */
-
-let deck = [];        // hàng thẻ cần ôn
-let deckPos = 0;
-
-function edgesFor(id) {
-  const edges = Array.isArray(DATA.edges) ? DATA.edges : [];
-  const byId = {};
-  flatten(DATA.nodes).forEach(({ node }) => { byId[node.id] = node; });
-  const out = [];
-  edges.forEach((e) => {
-    if (e.tu === id) out.push(`→ ${(byId[e.den] && byId[e.den].ten) || e.den}: ${e.nhan || ''}`);
-    if (e.den === id) out.push(`← ${(byId[e.tu] && byId[e.tu].ten) || e.tu}: ${e.nhan || ''}`);
-  });
-  return out;
-}
-
-function startReview(onlyWeak) {
-  let items = flatten(DATA.nodes);
-  if (onlyWeak) items = items.filter(({ node }) => getState(node.id) !== 'vung');
-  if (!items.length) {
-    toast(onlyWeak ? 'Không còn phần nào chưa vững để ôn. 🎉' : 'Chưa có phần nào để ôn.');
-    return;
-  }
-  // xáo trộn
-  for (let i = items.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [items[i], items[j]] = [items[j], items[i]]; }
-  deck = items; deckPos = 0;
-  $('#reviewOverlay').hidden = false;
-  document.body.style.overflow = 'hidden';
-  showCard(false);
-}
-
-function endReview() {
-  $('#reviewOverlay').hidden = true;
-  document.body.style.overflow = '';
-  render();
-}
-
-function showCard(revealed) {
-  if (deckPos >= deck.length) { endReview(); toast('Xong một lượt ôn! 🎉'); return; }
-  const { node, parentTen } = deck[deckPos];
-  const st = getState(node.id);
-  const conns = edgesFor(node.id);
-
-  $('#rvCount').textContent = `Thẻ ${deckPos + 1}/${deck.length}`;
-  $('#rvKind').textContent = loaiLabel(node.loai) + (parentTen ? ' · thuộc ' + parentTen : '');
-  $('#rvTitle').textContent = node.ten || node.id;
-  $('#rvCurState').textContent = 'Hiện tại: ' + STATE_LABEL[st];
-  $('#rvCurState').className = 'rv__cur s-badge-' + st;
-
-  const ask = $('#rvAsk'), ans = $('#rvAnswer');
-  if (!revealed) {
-    ask.hidden = false; ans.hidden = true;
-    $('#rvReveal').hidden = false; $('#rvGrades').hidden = true;
-  } else {
-    ask.hidden = true; ans.hidden = false;
-    $('#rvMoTa').textContent = node.moTa || '(chưa có mô tả)';
-    const cw = $('#rvConns');
-    cw.innerHTML = '';
-    if (conns.length) {
-      conns.forEach((c) => { const li = document.createElement('li'); li.textContent = c; cw.appendChild(li); });
-      $('#rvConnsWrap').hidden = false;
-    } else { $('#rvConnsWrap').hidden = true; }
-    $('#rvReveal').hidden = true; $('#rvGrades').hidden = false;
-  }
-}
-
-function grade(st) {
-  const { node } = deck[deckPos];
-  setState(node.id, st);
-  deckPos++;
-  showCard(false);
 }
 
 /* ---------- Tiện ích ---------- */
@@ -453,6 +437,61 @@ function toast(msg) {
   toastTimer = setTimeout(() => { t.hidden = true; }, 2600);
 }
 
+/* ---------- Pan + zoom ---------- */
+
+function bindPan() {
+  const wrap = $('#mapWrap');
+  const pts = new Map();
+  let lastX = 0, lastY = 0, moved = false;
+  let pinchDist = 0, pinchMx = 0, pinchMy = 0;
+  const rel = (cx, cy) => { const r = wrap.getBoundingClientRect(); return { x: cx - r.left, y: cy - r.top }; };
+
+  wrap.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size === 1) { moved = false; lastX = e.clientX; lastY = e.clientY; }
+    else if (pts.size === 2) {
+      const [a, b] = [...pts.values()];
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+      const m = rel((a.x + b.x) / 2, (a.y + b.y) / 2); pinchMx = m.x; pinchMy = m.y; moved = true;
+    }
+  });
+  window.addEventListener('pointermove', (e) => {
+    if (!pts.has(e.pointerId)) return;
+    pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pts.size >= 2) {
+      const [a, b] = [...pts.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      const m = rel((a.x + b.x) / 2, (a.y + b.y) / 2);
+      if (pinchDist > 0) zoomAt(dist / pinchDist, m.x, m.y);
+      view.tx += (m.x - pinchMx); view.ty += (m.y - pinchMy); applyTransform();
+      pinchDist = dist; pinchMx = m.x; pinchMy = m.y; moved = true; e.preventDefault();
+      return;
+    }
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (!moved && Math.abs(dx) + Math.abs(dy) > 5) { moved = true; wrap.classList.add('grabbing'); }
+    if (moved) { view.tx += dx; view.ty += dy; applyTransform(); e.preventDefault(); }
+  });
+  const up = (e) => {
+    pts.delete(e.pointerId);
+    if (pts.size < 2) pinchDist = 0;
+    if (pts.size === 1) { const p = [...pts.values()][0]; lastX = p.x; lastY = p.y; }
+    if (pts.size === 0) {
+      if (moved) { justPanned = true; setTimeout(() => { justPanned = false; }, 0); }
+      wrap.classList.remove('grabbing');
+    }
+  };
+  window.addEventListener('pointerup', up);
+  window.addEventListener('pointercancel', up);
+
+  wrap.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const m = rel(e.clientX, e.clientY);
+    zoomAt(e.deltaY < 0 ? 1.12 : 1 / 1.12, m.x, m.y);
+  }, { passive: false });
+}
+
 /* ---------- Sự kiện ---------- */
 
 function bind() {
@@ -462,7 +501,12 @@ function bind() {
   $('#btnImport2').addEventListener('click', openPicker);
   fileInput.addEventListener('change', () => importFromFile(fileInput.files[0]));
 
-  // Tủ nhiều dự án
+  $('#btnImportUrl').addEventListener('click', () => {
+    const u = prompt('Dán LINK TẢI TRỰC TIẾP tới sodo.json\n(ví dụ link "raw" của Gist bí mật):');
+    if (u) importFromUrl(u);
+  });
+  $('#btnRefresh').addEventListener('click', () => { if (DATA) refreshProject(projName(DATA), { silent: false }); });
+
   $('#projectPicker').addEventListener('change', (e) => switchProject(e.target.value));
   $('#btnDeleteProject').addEventListener('click', () => {
     if (!DATA) return;
@@ -470,21 +514,14 @@ function bind() {
     if (confirm(`Xoá "${name}" khỏi tủ? (Chỉ xoá trong app này, không đụng file gốc.)`)) deleteProject(name);
   });
 
-  // Mở bảng chọn kiểu ôn
-  $('#btnReview').addEventListener('click', () => { $('#reviewStart').hidden = false; });
-  $('#rsAll').addEventListener('click', () => { $('#reviewStart').hidden = true; startReview(false); });
-  $('#rsWeak').addEventListener('click', () => { $('#reviewStart').hidden = true; startReview(true); });
-  $('#rsCancel').addEventListener('click', () => { $('#reviewStart').hidden = true; });
+  $('#zoomIn').addEventListener('click', () => zoomBy(1.25));
+  $('#zoomOut').addEventListener('click', () => zoomBy(0.8));
+  $('#zoomReset').addEventListener('click', () => { view.fitted = false; drawMap(); });
 
-  $('#rvReveal').addEventListener('click', () => showCard(true));
-  $('#rvClose').addEventListener('click', endReview);
-  $('#rvGradeChua').addEventListener('click', () => grade('chua'));
-  $('#rvGradeLomo').addEventListener('click', () => grade('lomo'));
-  $('#rvGradeVung').addEventListener('click', () => grade('vung'));
-
-  $('#zoomIn').addEventListener('click', () => { zoom = Math.min(3, zoom + 0.25); drawMap(); });
-  $('#zoomOut').addEventListener('click', () => { zoom = Math.max(0.5, zoom - 0.25); drawMap(); });
-  $('#zoomReset').addEventListener('click', () => { zoom = 1; drawMap(); });
+  bindPan();
+  let rzT; window.addEventListener('resize', () => {
+    clearTimeout(rzT); rzT = setTimeout(() => { if (DATA) { view.fitted = false; drawMap(); } }, 160);
+  });
 
   const dz = $('#dropZone');
   ['dragenter', 'dragover'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
@@ -496,7 +533,6 @@ function bind() {
 
 async function boot() {
   bind();
-  // Di cư: nếu còn cache đơn kiểu cũ và tủ đang trống → đưa vào tủ.
   try {
     const lib = loadLib();
     const old = localStorage.getItem(OLD_DATA_KEY);
@@ -514,7 +550,6 @@ async function boot() {
     switchProject(lib[cur] ? cur : names[0]);
     return;
   }
-  // Tủ trống → xem tạm file mẫu (không lưu vào tủ).
   try {
     const res = await fetch('sample-sodo.json', { cache: 'no-store' });
     if (res.ok) { useData(await res.json(), { addToLib: false }); return; }
