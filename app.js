@@ -360,21 +360,22 @@ function drawMap() {
     vp.appendChild(g);
   });
 
-  // CHỈ MỘT nhãn: nối A–B đang xem. Neo cạnh ô B, lệch về phía A (nằm dọc mũi tên đậm),
-  // né không đè chữ trong ô. Không còn đẩy-lệch rối như trước.
+  // CHỈ MỘT nhãn: nối A–B đang xem, đặt ở CHÍNH GIỮA mũi tên đậm. Chỉ một mũi tên nổi
+  // mỗi lúc nên để giữa vẫn rõ nó thuộc nối nào — không còn đẩy-lệch rối như trước.
   if (selectedId && activeNeighborId) {
     const edge = edges.find((e) =>
       (e.tu === selectedId && e.den === activeNeighborId) ||
       (e.den === selectedId && e.tu === activeNeighborId));
     const A = pos[selectedId], B = pos[activeNeighborId];
     if (edge && edge.nhan && A && B) {
-      const dx = A.x - B.x, dy = A.y - B.y, L = Math.hypot(dx, dy) || 1;
+      const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy) || 1;
       const ux = dx / L, uy = dy / L;
-      const { w, h } = labelSize(edge.nhan);
+      const aDist = borderDist(NW / 2, heights[selectedId] / 2, ux, uy);
       const bDist = borderDist(NW / 2, heights[activeNeighborId] / 2, ux, uy);
-      let off = bDist + h / 2 + 10;                 // ra ngoài mép B một chút
-      off = Math.min(off, Math.max(bDist + h / 2 + 6, L - h / 2 - 10)); // đừng vượt quá phía A
-      drawEdgeLabel(vp, B.x + ux * off, B.y + uy * off, edge.nhan, w, h);
+      const ax = A.x + ux * aDist, ay = A.y + uy * aDist;   // mép ô A
+      const bx = B.x - ux * bDist, by = B.y - uy * bDist;   // mép ô B
+      const { w, h } = labelSize(edge.nhan);
+      drawEdgeLabel(vp, (ax + bx) / 2, (ay + by) / 2, edge.nhan, w, h);  // giữa đoạn thấy được
     }
   }
 
