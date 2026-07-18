@@ -61,6 +61,14 @@
           <svg id="map" xmlns="http://www.w3.org/2000/svg"></svg>
         </div>
         <div class="hint" id="mapHint"></div>
+
+        <!-- Tấm phủ chi tiết một ô: chỉ hiện ở toàn màn hình, che sơ đồ, back về là thấy lại. -->
+        <div class="nodeSheet" id="nodeSheet" hidden>
+          <div class="nodeSheet__head">
+            <button class="btn btn--outline" id="btnSheetBack" type="button">← Sơ đồ</button>
+          </div>
+          <div class="detail nodeSheet__body" id="nodeSheetBody"></div>
+        </div>
       </section>
 
       <section class="panel">

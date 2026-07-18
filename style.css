@@ -126,11 +126,28 @@ body.fs .panel--map .hint {
   background: var(--bg); border-top: 1px solid var(--line-soft);
   padding-bottom: max(8px, env(safe-area-inset-bottom));
 }
+/* Nút "Xem chi tiết" gắn vào thanh gợi ý khi có ô đang chọn (chỉ toàn màn hình). */
+.hint__detail { display: block; width: 100%; margin-top: 8px; }
+
+/* Tấm phủ chi tiết một ô: mặc định ẩn; chỉ hiện khi toàn màn hình và không [hidden]. */
+.nodeSheet { display: none; }
+body.fs .nodeSheet:not([hidden]) {
+  display: flex; flex-direction: column;
+  position: absolute; inset: 0; z-index: 5; background: var(--bg);
+}
+.nodeSheet__head {
+  flex: 0 0 auto; z-index: 1;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) 8px max(10px, env(safe-area-inset-left));
+  border-bottom: 2px solid var(--ink);
+}
+.nodeSheet__body { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
 
 /* Vùng bản đồ: nền trắng trơn (không lưới để tránh bóng ma trên E Ink). */
 .mapwrap {
   overflow: hidden; height: min(62vh, 520px); cursor: grab;
   touch-action: none; overscroll-behavior: contain; background: var(--bg);
+  /* Tắt bôi đen chọn chữ để kéo chuột luôn là PAN, không bị lẫn với quét chọn. */
+  -webkit-user-select: none; user-select: none;
 }
 .mapwrap.grabbing { cursor: grabbing; }
 #map { display: block; width: 100%; height: 100%; }

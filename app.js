@@ -384,11 +384,41 @@ function drawMap() {
   }
 
   svg.onclick = () => { if (!justPanned) selectNode(null); };
-  $('#mapHint').textContent = !selectedId
+  const hint = $('#mapHint');
+  hint.textContent = !selectedId
     ? 'Chạm ô để xem kết nối · kéo nền để di chuyển · cuộn/chụm để phóng.'
     : (activeNeighborId
       ? 'Chạm ô đó lần nữa để đi tiếp · chạm ô/mũi tên khác để xem nối khác · chạm nền để bỏ chọn.'
       : 'Chạm ô hàng xóm (hoặc mũi tên) để xem lý do nối · chạm nền để bỏ chọn.');
+  // Toàn màn hình + có ô đang chọn: thêm nút mở chi tiết ô đó (không đụng luồng xem kết nối).
+  if (fsOn && selectedId) {
+    const nd = topNodeById(selectedId);
+    const b = hel('button', { class: 'btn hint__detail', type: 'button' });
+    b.textContent = 'Xem chi tiết: ' + (nd ? (nd.ten || nd.id) : selectedId);
+    b.addEventListener('click', (ev) => { ev.stopPropagation(); openNodeSheet(selectedId); });
+    hint.appendChild(b);
+  }
+}
+
+function topNodeById(id) { return (DATA && DATA.nodes || []).find((n) => n.id === id) || null; }
+
+/* Tấm phủ chi tiết một ô (chỉ ở toàn màn hình): tái dùng thẻ chi tiết có sẵn, back về sơ đồ nguyên trạng. */
+function openNodeSheet(id) {
+  const node = topNodeById(id);
+  if (!node) return;
+  const body = $('#nodeSheetBody');
+  body.innerHTML = '';
+  const card = areaCard(node);
+  body.appendChild(card);
+  // Bung sẵn danh sách con của ô để thấy chi tiết ngay, khỏi phải chạm mở.
+  const topRow = card.querySelector(':scope > .row');
+  if (topRow && topRow.querySelector('.row__chev')) topRow.click();
+  $('#nodeSheet').hidden = false;
+  body.scrollTop = 0;
+}
+function closeNodeSheet() {
+  const s = $('#nodeSheet');
+  if (s) s.hidden = true;
 }
 
 function applyTransform(g) {
@@ -659,6 +689,7 @@ function enterFs() {
 function closeFs() {                       // gỡ chế độ, KHÔNG đụng lịch sử (gọi khi popstate báo về)
   if (!fsOn) return;
   fsOn = false;
+  closeNodeSheet();                        // ra khỏi toàn màn hình thì bỏ luôn tấm phủ chi tiết
   document.body.classList.remove('fs');
   refitMap();
 }
@@ -700,6 +731,7 @@ function bind() {
   // Toàn màn hình: vào / ra + phím Esc + nút Back
   $('#btnFsEnter').addEventListener('click', enterFs);
   $('#btnFsExit').addEventListener('click', requestExitFs);
+  $('#btnSheetBack').addEventListener('click', closeNodeSheet);
   window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && fsOn) requestExitFs(); });
   window.addEventListener('popstate', () => { if (fsOn) closeFs(); });
 
